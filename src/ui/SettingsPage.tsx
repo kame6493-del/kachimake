@@ -90,8 +90,8 @@ export function SettingsPage({ data, premium, setSettings, replaceData, onPaywal
         <div className="field">
           <span className="field-label">黒字(勝ち)の色</span>
           <div className="opts">
-            <button aria-pressed={s.winColor === 'ink'} className={`opt ${s.winColor === 'ink' ? 'on' : ''}`} onClick={() => setSettings({ ...s, winColor: 'ink' })}>金(いつもの色)</button>
-            <button aria-pressed={s.winColor === 'blue'} className={`opt ${s.winColor === 'blue' ? 'on' : ''}`} onClick={() => setSettings({ ...s, winColor: 'blue' })}>青(赤と区別しやすい)</button>
+            <button aria-pressed={s.winColor === 'ink'} className={`opt ${s.winColor === 'ink' ? 'on' : ''}`} onClick={() => setSettings({ ...s, winColor: 'ink' })}>青(いつもの色)</button>
+            <button aria-pressed={s.winColor === 'blue'} className={`opt ${s.winColor === 'blue' ? 'on' : ''}`} onClick={() => setSettings({ ...s, winColor: 'blue' })}>黒(帳簿と同じ)</button>
           </div>
         </div>
       </section>

@@ -17,11 +17,11 @@ import { hype } from './domain/stats';
 import { Paywall } from './ui/Paywall';
 
 type Tab = 'home' | 'analysis' | 'counter' | 'settings';
-const TABS: { id: Tab; label: string }[] = [
-  { id: 'home', label: '記録' },
-  { id: 'analysis', label: '分析' },
-  { id: 'counter', label: 'カウンター' },
-  { id: 'settings', label: '設定' },
+const TABS: { id: Tab; label: string; icon: string }[] = [
+  { id: 'home', label: 'カレンダー', icon: 'M4 6h16v14H4zM4 10h16M8 3v4M16 3v4' },
+  { id: 'analysis', label: '分析', icon: 'M5 20V11M11 20V5M17 20v-7M3 20h18' },
+  { id: 'counter', label: 'カウンター', icon: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 8v8M8 12h8' },
+  { id: 'settings', label: '設定', icon: 'M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1' },
 ];
 
 const UNLOCK_KEY = 'kachimake.unlockUntil';
@@ -240,13 +240,14 @@ export default function App() {
       {adsMock && bannerVisible && <div className="ad-mock" aria-hidden="true">広告(開発用の見本)</div>}
 
       {tab === 'home' && (
-        <button className="fab" aria-label="収支を記入" onClick={() => setForm({ session: null, date: selected })}>記入</button>
+        <button className="fab" aria-label="収支を記入" onClick={() => setForm({ session: null, date: selected })}>+</button>
       )}
 
       <nav className="tabbar" aria-label="画面の切り替え">
         {TABS.map((t) => (
           <button key={t.id} className={tab === t.id ? 'on' : ''} aria-current={tab === t.id ? 'page' : undefined} onClick={() => setTab(t.id)}>
-            {t.label}
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d={t.icon} /></svg>
+            <span>{t.label}</span>
           </button>
         ))}
       </nav>

@@ -16,7 +16,7 @@ OUT = ROOT / 'store-assets'
 RES = ROOT / 'android' / 'app' / 'src' / 'main' / 'res'
 IOS = ROOT / 'ios' / 'App' / 'App' / 'Assets.xcassets'
 
-PAPER = (0x0F, 0x2A, 0x20)  # 起動画面の地はアプリと同じ深緑
+PAPER = (0xF2, 0xF2, 0xF7)  # 起動画面の地はアプリと同じ明るい灰色
 
 icon = Image.open(SRC / 'icon.png').convert('RGB')
 feature = Image.open(SRC / 'feature.png').convert('RGB')

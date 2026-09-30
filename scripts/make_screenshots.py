@@ -10,33 +10,19 @@ from PIL import Image, ImageDraw, ImageFont
 
 ROOT = Path(__file__).resolve().parent.parent
 A = ROOT / 'store-assets'
-INK = (0xF7, 0xC9, 0x48)  # 見出しは金
-SUMI2 = (0xC9, 0xD8, 0xCF)
+INK = (0x1C, 0x1C, 0x1E)  # 見出しは黒(売れている収支アプリの型: 黄色の地に太い黒文字)
+SUMI2 = (0x3A, 0x2E, 0x00)
 
 SHOTS = [
-    ('home', '今月いくら勝ったか、ひと目で', '投資と回収を入れるだけ。称号と連勝も出る'),
-    ('analysis', '回収率も時給も、1画面で', '累計の推移・種類ごと・店や機種ごとの収支'),
-    ('counter', '数えた小役から、設定を推測', 'ホールの中でも押しやすい大きなボタン'),
-    ('celebrate', '勝った日は、派手に祝う', '1万円以上で「大勝!」、5万円以上で「激アツ!!」'),
+    ('home', 'カレンダーで収支がひと目で', '投資と回収を入れるだけ。称号と連勝も出る'),
+    ('analysis', '回収率も時給もまとめて分析', '累計の推移・種類ごと・店や機種ごとの収支'),
+    ('counter', '小役を数えて設定を推測', 'ホールの中でも押しやすい大きなボタン'),
+    ('celebrate', '勝った日は派手に祝う', '1万円以上で「大勝!」、5万円以上で「激アツ!!」'),
 ]
 
 def turf_bg(W: int, H: int) -> Image.Image:
-    """アプリと同じ深緑の地に、上から光が当たったような明るみと、金の二重線を引いた下地"""
-    import math
-    img = Image.new('RGB', (W, H))
-    px = img.load()
-    for y in range(H):
-        for x in range(0, W):
-            d = math.hypot((x - W / 2) / W, (y + H * 0.1) / (H * 0.55))
-            t = max(0.0, min(1.0, 1 - d))
-            px[x, y] = (int(11 + (26 - 11) * t), int(33 + (90 - 33) * t), int(24 + (65 - 24) * t))
-    d = ImageDraw.Draw(img)
-    y = round(H * 0.18)
-    x0, x1 = round(W * 0.08), round(W * 0.92)
-    th = max(2, round(W / 400))
-    d.rectangle((x0, y - th, x1, y), fill=INK)
-    d.rectangle((x0, y + 3 * th, x1, y + 4 * th), fill=INK)
-    return img
+    """黄色一色の下地(売れている収支アプリのストア画像の型)"""
+    return Image.new('RGB', (W, H), (0xF9, 0xB7, 0x12))
 
 # (ストア, 幅, 高さ)。Google Play は 9:16 か 16:9 だけ受け付ける
 TARGETS = [('appstore', 1242, 2688), ('appstore69', 1320, 2868), ('play', 1080, 1920)]
@@ -46,8 +32,8 @@ def make(store: str, W: int, H: int):
     # 下地は幅を合わせて縮め、上から高さぶんを使う(二重線は上18%にあるので残る)
     bg = turf_bg(W, H)
     k = W / 1242
-    mincho = ImageFont.truetype('C:/Windows/Fonts/yumindb.ttf', round(76 * k))
-    subf = ImageFont.truetype('C:/Windows/Fonts/YuGothM.ttc', round(40 * k))
+    mincho = ImageFont.truetype('C:/Windows/Fonts/YuGothB.ttc', round(80 * k))
+    subf = ImageFont.truetype('C:/Windows/Fonts/YuGothB.ttc', round(42 * k))
     rule_y = round(H * 0.18)
     for i, (name, head, sub) in enumerate(SHOTS, 1):
         _one(store, W, H, bg, rule_y, mincho, subf, i, name, head, sub)
@@ -57,9 +43,8 @@ def _one(store, W, H, bg, rule_y, MINCHO, SUB, i, name, head, sub):
     img = bg.copy()
     d = ImageDraw.Draw(img)
     # 見出しは二重線の上。左端は二重線の左端(幅の約8%)にそろえる
-    left = round(W * 0.08)
-    d.text((left, rule_y - round(56 * W / 1242)), head, font=MINCHO, fill=INK, anchor='ls')
-    d.text((left, rule_y + round(86 * W / 1242)), sub, font=SUB, fill=SUMI2, anchor='ls')
+    d.text((W // 2, rule_y - round(40 * W / 1242)), head, font=MINCHO, fill=INK, anchor='ms')
+    d.text((W // 2, rule_y + round(70 * W / 1242)), sub, font=SUB, fill=SUMI2, anchor='ms')
 
     shot = Image.open(A / 'raw' / f'{name}.png').convert('RGB')
     sw = round(W * 0.78)
@@ -71,7 +56,8 @@ def _one(store, W, H, bg, rule_y, MINCHO, SUB, i, name, head, sub):
     shot = shot.resize((sw, sh), Image.LANCZOS)
     x = (W - sw) // 2
     img.paste(shot, (x, top))
-    d.rectangle((x - 2, top - 2, x + sw + 1, top + sh + 1), outline=INK, width=3)
+    # 画面の外周は黒い太めの角丸(スマホの枠に見えるように)
+    d.rounded_rectangle((x - 14, top - 14, x + sw + 13, top + sh + 13), radius=round(48 * W / 1242), outline=INK, width=round(14 * W / 1242))
     out = A / f'{store}-{i}-{name}-{W}x{H}.png'
     img.save(out)
     print(out.name, 'image', shot.size)
