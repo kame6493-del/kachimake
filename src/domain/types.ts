@@ -33,6 +33,14 @@ export interface Session {
   /** 券種(公営競技のみ) */
   betType?: string;
   memo: string;
+  /** 1玉・1枚の円(パチンコ・パチスロだけ)。4円パチンコなら 4、20円スロットなら 20 */
+  rate?: number;
+  /** 貯玉・貯メダルから再プレイした数(投資に円換算で含まれている) */
+  replay?: number;
+  /** 貯玉・貯メダルにした数(回収に円換算で含まれている) */
+  saved?: number;
+  /** イベント日・特定日などの印 */
+  tags?: string[];
   createdAt: number;
   updatedAt: number;
 }
@@ -44,9 +52,17 @@ export interface Settings {
   weekStart: 0 | 1;
   /** 黒字を何色で出すか。既定は墨(帳簿の黒字)。赤と黒の区別が苦手な人は青 */
   winColor: 'ink' | 'blue';
+  /** 文字の大きさ。1=標準 */
+  fontScale: 1 | 1.15 | 1.3;
+  /** 夜の記入のお知らせ。time は HH:MM */
+  remind: { on: boolean; time: string };
 }
 
-export const DEFAULT_SETTINGS: Settings = { monthlyLimit: 0, weekStart: 0, winColor: 'ink' };
+export const DEFAULT_SETTINGS: Settings = { monthlyLimit: 0, weekStart: 0, winColor: 'ink', fontScale: 1, remind: { on: false, time: '21:30' } };
+
+/** パチンコ・パチスロのレート(円/玉・円/枚) */
+export const RATES: Record<'pachinko' | 'slot', number[]> = { pachinko: [4, 2, 1, 0.5], slot: [20, 10, 5, 2] };
+export const DEFAULT_TAGS = ['イベント日', '特定日', '新台', '旧イベ', 'ゾロ目', '給料日後'];
 
 export interface CounterMachine {
   id: string;

@@ -13,9 +13,10 @@ interface Props {
   setSelected: (d: string) => void;
   onEdit: (s: Session) => void;
   onAdd: (date: string) => void;
+  onShare: () => void;
 }
 
-export function Home({ data, month, setMonth, selected, setSelected, onEdit, onAdd }: Props) {
+export function Home({ data, month, setMonth, selected, setSelected, onEdit, onAdd, onShare }: Props) {
   const { from, to } = monthRange(month);
   const monthList = useMemo(() => inRange(data.sessions, from, to), [data.sessions, from, to]);
   const sum = useMemo(() => summarize(monthList), [monthList]);
@@ -63,9 +64,15 @@ export function Home({ data, month, setMonth, selected, setSelected, onEdit, onA
               </>
             )}
           </div>
+          {sum.count > 0 && (
+            <button className="share-btn" onClick={onShare} aria-label={`${m}月の収支を画像でシェア`}>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 8l5-5 5 5M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" /></svg>
+              画像でシェア
+            </button>
+          )}
         </div>
 
-        {limit && (
+        {limit && limit.lost > 0 && (
           <div className={`limit ${limit.ratio >= 1 ? 'over' : ''}`}>
             <div className="limit-text">
               {limit.ratio >= 1

@@ -13,8 +13,14 @@ import { Counter } from './ui/Counter';
 import { SettingsPage } from './ui/SettingsPage';
 import { SessionForm } from './ui/SessionForm';
 import { Celebrate, type Hype } from './ui/Celebrate';
-import { hype } from './domain/stats';
-import { Paywall } from './ui/Paywall';
+import { hype, streak, summarize, title, inRange } from './domain/stats';
+import { INTRO, Paywall } from './ui/Paywall';
+import { monthRange } from './domain/data';
+import { parseReview, reminderDates, shouldAskReview, shouldShowIntro } from './domain/nudge';
+import { askReview, keepAwake, scheduleReminders } from './platform/native';
+import { shareCard, type ShareCard } from './platform/shareImage';
+import { dateJa, pct } from './ui/format';
+import { kindInfo } from './domain/types';
 
 type Tab = 'home' | 'analysis' | 'counter' | 'settings';
 const TABS: { id: Tab; label: string; icon: string }[] = [
@@ -26,6 +32,8 @@ const TABS: { id: Tab; label: string; icon: string }[] = [
 
 const UNLOCK_KEY = 'kachimake.unlockUntil';
 const DAILY_KEY = 'kachimake.rewardDaily';
+const REVIEW_KEY = 'kachimake.review';
+const INTRO_KEY = 'kachimake.introShown';
 const readLocal = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };
 const writeLocal = (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* この回だけ有効 */ } };
 const untilText = (t: number) => {
@@ -54,9 +62,12 @@ export default function App() {
   });
   const [month, setMonth] = useState(today().slice(0, 7));
   const [selected, setSelected] = useState(today());
-  const [form, setForm] = useState<{ session: Session | null; date: string } | null>(null);
-  const [paywall, setPaywall] = useState<string | null>(null);
+  // 開発時だけ: ?sheet=form / paywall / intro で画面写真を撮る
+  const devSheet = import.meta.env.DEV ? new URLSearchParams(location.search).get('sheet') : null;
+  const [form, setForm] = useState<{ session: Session | null; date: string } | null>(devSheet === 'form' ? { session: null, date: today() } : null);
+  const [paywall, setPaywall] = useState<string | null>(devSheet === 'paywall' ? '店舗・場ごとの収支' : devSheet === 'intro' ? INTRO : null);
   const [toastMsg, setToastMsg] = useState('');
+  const [toastAct, setToastAct] = useState<{ label: string; run: () => void } | null>(null);
   const toastTimer = useRef<number | undefined>(undefined);
   const [ads, setAds] = useState<AdsState>({ allowed: false, privacyOptions: false });
   const [adHeight, setAdHeight] = useState(0);
@@ -68,7 +79,14 @@ export default function App() {
     const c = import.meta.env.DEV ? new URLSearchParams(location.search).get('celebrate') : null;
     return c === 'jackpot' || c === 'big' || c === 'win' ? { kind: c, amount: c === 'jackpot' ? 58600 : c === 'big' ? 16200 : 3500 } : null;
   });
-  const endCelebrate = useCallback(() => setCelebrate(null), []);
+  // 演出が終わった後にすること(シェアの案内・評価のお願い・無料体験の案内)
+  const afterCelebrate = useRef<(() => void) | null>(null);
+  const endCelebrate = useCallback(() => {
+    setCelebrate(null);
+    const f = afterCelebrate.current;
+    afterCelebrate.current = null;
+    f?.();
+  }, []);
 
   useEffect(() => {
     loadData().then(setData).catch(() => setData(emptyData()));
@@ -112,11 +130,36 @@ export default function App() {
     return () => { void h.then((x) => x.remove()); };
   }, []);
 
-  const toast = useCallback((msg: string) => {
+  const toast = useCallback((msg: string, act?: { label: string; run: () => void }) => {
     setToastMsg(msg);
+    setToastAct(act ?? null);
     window.clearTimeout(toastTimer.current);
-    toastTimer.current = window.setTimeout(() => setToastMsg(''), 2600);
+    toastTimer.current = window.setTimeout(() => { setToastMsg(''); setToastAct(null); }, act ? 6000 : 2600);
   }, []);
+
+  // カウンターを開いている間は画面を消さない
+  useEffect(() => {
+    void keepAwake(tab === 'counter');
+  }, [tab]);
+
+  // 文字の大きさ
+  const fontScale = data?.settings.fontScale ?? 1;
+  useEffect(() => {
+    document.documentElement.style.setProperty('--zoom', String(fontScale));
+  }, [fontScale]);
+
+  // 夜のお知らせ: 設定か「今日記入したか」が変わったら置き直す
+  const remindOn = data?.settings.remind.on ?? false;
+  const remindTime = data?.settings.remind.time ?? '21:30';
+  const wroteToday = !!data?.sessions.some((s) => s.date === today());
+  useEffect(() => {
+    if (!data) return;
+    const n = new Date();
+    const dates = remindOn ? reminderDates(data.sessions.filter((s) => s.date === today()), today(), n.getHours() * 60 + n.getMinutes(), remindTime) : [];
+    void scheduleReminders(dates, remindTime);
+    // data.sessions 全体でなく「今日記入したか」だけで置き直す
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [remindOn, remindTime, wroteToday, !!data]);
 
   // 書き込みは必ず直前の値から計算する。連打で前の回数を上書きして消さないため
   const mutate = useCallback((fn: (d: AppData) => AppData) => setData((prev) => (prev ? fn(prev) : prev)), []);
@@ -145,8 +188,58 @@ export default function App() {
     setMonth(s.date.slice(0, 7));
     // 新しく記入した勝ちだけ演出する(直したときや負けの記入では出さない)
     const h = exists ? null : hype(s.payout - s.invest);
-    if (h) setCelebrate({ kind: h, amount: s.payout - s.invest });
-    else toast(exists ? '直しました' : '記入しました');
+    const newCount = data.sessions.length + (exists ? 0 : 1);
+    const intro = !exists && billing.status === 'ready' && billing.plans.some((x) => x.trial)
+      && shouldShowIntro(newCount, readLocal(INTRO_KEY) === '1', premium);
+    const openIntro = () => { writeLocal(INTRO_KEY, '1'); setPaywall(INTRO); };
+    if (h) {
+      const review = parseReview(readLocal(REVIEW_KEY));
+      const ask = shouldAskReview(review, Date.now(), newCount, h);
+      afterCelebrate.current = () => {
+        if (ask) {
+          writeLocal(REVIEW_KEY, JSON.stringify({ asked: review.asked + 1, last: Date.now() }));
+          void askReview();
+        } else if (intro) {
+          openIntro();
+          return;
+        }
+        toast('この勝ちを画像で自慢できます', { label: 'シェア', run: () => void shareWin(s) });
+      };
+      setCelebrate({ kind: h, amount: s.payout - s.invest });
+    } else {
+      toast(exists ? '直しました' : '記入しました');
+      if (intro) window.setTimeout(openIntro, 700);
+    }
+  };
+  const doShare = async (card: ShareCard) => {
+    const r = await shareCard(card);
+    if (r === 'saved') toast('画像を保存しました');
+    if (r === 'failed') toast('画像を作れませんでした');
+  };
+  const shareWin = (s: Session) => {
+    const p = s.payout - s.invest;
+    const h = hype(p);
+    return doShare({
+      head: `${dateJa(s.date)} ${kindInfo(s.kind).label}`,
+      amount: p,
+      badge: h === 'jackpot' ? '激アツ!!' : h === 'big' ? '大勝!' : '勝ち!',
+      lines: [[s.target, s.place].filter(Boolean).join(' / ') || kindInfo(s.kind).label, `投資 ¥${s.invest.toLocaleString('ja-JP')} → 回収 ¥${s.payout.toLocaleString('ja-JP')}`],
+    });
+  };
+  const shareMonth = () => {
+    const { from, to } = monthRange(month);
+    const sum = summarize(inRange(data.sessions, from, to));
+    const run = month === today().slice(0, 7) ? streak(data.sessions) : null;
+    const [y, m] = month.split('-').map(Number);
+    return doShare({
+      head: `${y}年${m}月の収支`,
+      amount: sum.profit,
+      badge: title(sum.recovery) ?? undefined,
+      lines: [
+        `${sum.wins}勝${sum.losses}敗・回収率 ${pct(sum.recovery, 0)}`,
+        run && run.n >= 2 ? `いま${run.n}${run.kind === 'win' ? '連勝中' : '連敗中'}` : `${sum.count}回の記入`,
+      ],
+    });
   };
   const remove = (id: string) => {
     mutate((d) => ({ ...d, sessions: d.sessions.filter((x) => x.id !== id) }));
@@ -223,12 +316,12 @@ export default function App() {
       <main>
         {tab === 'home' && (
           <Home data={data} month={month} setMonth={setMonth} selected={selected} setSelected={setSelected}
-            onEdit={(s) => setForm({ session: s, date: s.date })} onAdd={(d) => setForm({ session: null, date: d })} />
+            onEdit={(s) => setForm({ session: s, date: s.date })} onAdd={(d) => setForm({ session: null, date: d })} onShare={() => void shareMonth()} />
         )}
         {tab === 'analysis' && <Analysis data={data} premium={access} unlockedUntil={!premium && access ? untilText(unlockUntil) : null} onPaywall={setPaywall} />}
         {tab === 'counter' && (
           <Counter data={data} premium={access} onPaywall={setPaywall} setCounter={setCounter}
-            saveMachine={saveMachine} deleteMachine={deleteMachine} />
+            saveMachine={saveMachine} deleteMachine={deleteMachine} toast={toast} />
         )}
         {tab === 'settings' && (
           <SettingsPage data={data} premium={premium} setSettings={setSettings} replaceData={commit}
@@ -260,7 +353,12 @@ export default function App() {
         <Paywall why={paywall} billing={billing} onBuy={buy} onRestore={doRestore} onClose={() => setPaywall(null)}
           reward={ads.allowed && !premium ? { left: rewardLeft, busy: rewardBusy, onWatch: watchReward } : null} />
       )}
-      {toastMsg && <div className="toast" role="status">{toastMsg}</div>}
+      {toastMsg && (
+        <div className={`toast ${toastAct ? 'has-act' : ''}`} role="status">
+          <span>{toastMsg}</span>
+          {toastAct && <button onClick={() => { const r = toastAct.run; setToastMsg(''); setToastAct(null); r(); }}>{toastAct.label}</button>}
+        </div>
+      )}
       {celebrate && <Celebrate kind={celebrate.kind} amount={celebrate.amount} onDone={endCelebrate} />}
     </div>
   );

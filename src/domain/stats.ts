@@ -76,7 +76,7 @@ export function inRange(list: Session[], from: string, to: string) {
   return list.filter((s) => s.date >= from && s.date <= to);
 }
 
-export type GroupKey = 'kind' | 'place' | 'target' | 'weekday' | 'betType';
+export type GroupKey = 'kind' | 'place' | 'target' | 'weekday' | 'betType' | 'tag';
 
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
 
@@ -95,6 +95,18 @@ export interface GroupRow {
 
 export function groupBy(list: Session[], key: GroupKey): GroupRow[] {
   const g = new Map<string, { label: string; kind?: Kind; items: Session[] }>();
+  if (key === 'tag') {
+    // 1回に印が2つあれば、両方の行に入れる
+    for (const s of list) {
+      for (const label of s.tags?.length ? s.tags : ['(印なし)']) {
+        if (!g.has(label)) g.set(label, { label, items: [] });
+        g.get(label)!.items.push(s);
+      }
+    }
+    return [...g.entries()]
+      .map(([k, v]) => ({ key: k, label: v.label, summary: summarize(v.items) }))
+      .sort((a, b) => (a.label === '(印なし)' ? 1 : b.label === '(印なし)' ? -1 : b.summary.profit - a.summary.profit));
+  }
   for (const s of list) {
     let label: string;
     let kind: Kind | undefined;
@@ -172,3 +184,56 @@ export function hype(p: number): 'jackpot' | 'big' | 'win' | null {
   if (p > 0) return 'win';
   return null;
 }
+
+/** いちばん最近の記入(日付、同じ日なら後から書いた方) */
+export function latest(list: Session[]): Session | null {
+  let best: Session | null = null;
+  for (const s of list) {
+    if (!best || s.date > best.date || (s.date === best.date && s.createdAt > best.createdAt)) best = s;
+  }
+  return best;
+}
+
+/** その種類でよく使った名前を多い順に。同数なら最近使った方を先に */
+export function frequent(list: Session[], kind: Kind, key: 'place' | 'target', n = 6): string[] {
+  const m = new Map<string, { c: number; last: string }>();
+  for (const s of list) {
+    if (s.kind !== kind || !s[key]) continue;
+    const cur = m.get(s[key]) ?? { c: 0, last: '' };
+    m.set(s[key], { c: cur.c + 1, last: s.date > cur.last ? s.date : cur.last });
+  }
+  return [...m.entries()].sort((a, b) => b[1].c - a[1].c || (a[1].last < b[1].last ? 1 : -1)).map(([k]) => k).slice(0, n);
+}
+
+/** 使ったことのある印。よく使う順 */
+export function usedTags(list: Session[]): string[] {
+  const m = new Map<string, number>();
+  for (const s of list) for (const t of s.tags ?? []) m.set(t, (m.get(t) ?? 0) + 1);
+  return [...m.entries()].sort((a, b) => b[1] - a[1]).map(([k]) => k);
+}
+
+export interface StockRow {
+  kind: 'pachinko' | 'slot';
+  place: string;
+  /** 残っている玉・メダル(貯めた数 - 再プレイした数) */
+  count: number;
+  /** 最後に使ったレート */
+  rate: number | null;
+}
+
+/** 店ごとの貯玉・貯メダル。店の名前が空の記入は数えない */
+export function stock(list: Session[]): StockRow[] {
+  const m = new Map<string, StockRow & { last: string }>();
+  for (const s of list) {
+    if ((s.kind !== 'pachinko' && s.kind !== 'slot') || !s.place || (!s.saved && !s.replay)) continue;
+    const k = `${s.kind}\u0000${s.place}`;
+    const cur = m.get(k) ?? { kind: s.kind, place: s.place, count: 0, rate: null, last: '' };
+    cur.count += (s.saved ?? 0) - (s.replay ?? 0);
+    if (s.rate && s.date >= cur.last) { cur.rate = s.rate; cur.last = s.date; }
+    m.set(k, cur);
+  }
+  return [...m.values()].map((r) => ({ kind: r.kind, place: r.place, count: r.count, rate: r.rate })).sort((a, b) => b.count - a.count);
+}
+
+/** 玉・メダルを円にする(端数は四捨五入) */
+export const ballsToYen = (n: number, rate: number) => Math.round(n * rate);

@@ -525,3 +525,77 @@ input, select, textarea { background: var(--surface); border: 1px solid var(--ru
   .burst, .particles, .celebrate.jackpot { animation: none !important; }
   .particles { display: none; }
 }
+
+/* ===== 1.1.0 で足した部品 ===== */
+/* 文字の大きさ(設定)。下のタブと記入ボタンは大きくしない */
+main, .sheet-body { zoom: var(--zoom, 1); }
+
+/* 今月の収支のシェア */
+.closing { position: relative; }
+.share-btn {
+  margin: 8px auto 0; display: inline-flex; align-items: center; gap: 4px;
+  font-size: 12px; font-weight: 800; padding: 6px 10px; border-radius: 16px; background: var(--field); color: var(--ink); min-height: 32px;
+}
+.share-btn svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+
+/* 操作つきのお知らせ */
+.toast { display: flex; align-items: center; gap: var(--s3); }
+.toast.has-act { width: max-content; }
+.toast button { background: var(--accent); color: var(--accent-ink); font-weight: 800; border-radius: 8px; padding: 6px 12px; min-height: 34px; white-space: nowrap; }
+
+/* 名前・印の候補 */
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font-size: 13px; font-weight: 600; padding: 6px 12px; min-height: 34px; border-radius: 17px; background: var(--surface); border: 1px solid var(--rule); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chip.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+
+/* 前回と同じ */
+.copy-last {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 1px; text-align: left; width: 100%;
+  padding: 10px 14px; border-radius: 12px; background: var(--surface); border: 1px dashed var(--accent);
+}
+.copy-last span { font-weight: 800; font-size: 14px; }
+.copy-last small { font-size: 12px; color: var(--sumi-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+
+/* 貯玉・貯メダル */
+.balls { display: flex; flex-direction: column; gap: var(--s2); }
+.balls-toggle { display: flex; justify-content: space-between; align-items: center; min-height: 44px; padding: 0 14px; border-radius: 10px; background: var(--surface); border: 1px solid var(--rule); font-weight: 700; font-size: 14px; }
+.balls-toggle span:last-child { font-size: 20px; color: var(--sumi-2); }
+.ball-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s2); }
+.ball-field .yen-input { padding-left: 0; padding-right: 12px; }
+.ball-field .yen-input input { font-size: 19px; text-align: right; }
+.ball-unit { font-size: 14px; }
+.ledger.stock thead th:nth-child(1) { width: 46%; }
+.ledger.stock thead th:nth-child(2) { width: 24%; }
+.ledger.stock thead th:nth-child(3) { width: 30%; }
+
+/* 設定: スイッチと時刻 */
+.switch { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; font-weight: 700; font-size: 14px; flex: 1; text-align: left; }
+.switch-knob { position: relative; width: 48px; height: 28px; border-radius: 14px; background: var(--rule); flex: none; transition: background 0.15s; }
+.switch-knob::after { content: ''; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25); transition: transform 0.15s; }
+.switch.on .switch-knob { background: var(--accent); }
+.switch.on .switch-knob::after { transform: translateX(20px); }
+.time-input { width: auto; flex: none; min-width: 110px; }
+.backup-nudge { font-size: 13px; font-weight: 700; padding: 10px 12px; border-radius: 10px; background: rgba(240, 56, 59, 0.08); color: var(--vermilion); }
+
+/* 有料プラン: 比べ表 */
+.pw-hero { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: var(--s3) var(--s2) var(--s2); }
+.pw-trial-badge { font-size: 13px; font-weight: 900; padding: 4px 14px; border-radius: 14px; background: var(--vermilion); color: #fff; }
+.pw-title { font-size: 19px; font-weight: 900; line-height: 1.4; }
+.pw-sub { font-size: 13px; color: var(--sumi-2); }
+.pw-table { width: 100%; border-collapse: separate; border-spacing: 0; background: var(--surface); border-radius: 12px; overflow: hidden; font-size: 13px; }
+.pw-table th, .pw-table td { padding: 9px 8px; border-bottom: 1px solid var(--rule); }
+.pw-table tr:last-child th, .pw-table tr:last-child td { border-bottom: 0; }
+.pw-table thead th { font-size: 12px; color: var(--sumi-2); font-weight: 700; text-align: center; }
+.pw-table tbody th { text-align: left; font-weight: 600; }
+.pw-table td { text-align: center; width: 22%; font-weight: 700; white-space: nowrap; }
+.pw-table .pro { background: rgba(249, 183, 18, 0.14); }
+.pw-table thead .pro { color: var(--accent-ink); background: var(--accent); }
+.pw-table .yes { color: var(--win); font-size: 16px; }
+.pw-table .no { color: var(--sumi-2); }
+.plan { position: relative; }
+.plan-off { position: absolute; top: -10px; right: 8px; font-size: 11px; font-weight: 900; padding: 2px 8px; border-radius: 10px; background: var(--vermilion); color: #fff; }
+
+.sheet-body .inline.nowrap .btn-line { flex: none; white-space: nowrap; }
+.reward { padding: var(--s3) var(--s4); border-radius: 12px; border-top: 0; }
+.settings .inline.nowrap .btn { white-space: nowrap; flex: none; }
+.ledger tbody th { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

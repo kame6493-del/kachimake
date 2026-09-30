@@ -3,6 +3,16 @@
   "appName": "カチマケ",
   "webDir": "dist",
   "backgroundColor": "#f2f2f7",
-  "ios": { "contentInset": "never" },
-  "android": { "allowMixedContent": false }
+  "ios": {
+    "contentInset": "never"
+  },
+  "android": {
+    "allowMixedContent": false
+  },
+  "plugins": {
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_notify",
+      "iconColor": "#F9B712"
+    }
+  }
 }

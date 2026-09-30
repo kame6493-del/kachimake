@@ -16,6 +16,21 @@ const num = (v: unknown) => {
 };
 const str = (v: unknown, max = 200) => (typeof v === 'string' ? v.slice(0, max) : '');
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
+const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+/** 玉・レート・タグは、あるときだけ持つ(古い版のバックアップには無い) */
+function stockFields(s: Record<string, unknown>): Partial<Session> {
+  const out: Partial<Session> = {};
+  const rate = Number(s.rate);
+  if (Number.isFinite(rate) && rate > 0 && rate <= 1000) out.rate = rate;
+  if (num(s.replay) > 0) out.replay = Math.min(num(s.replay), 9_999_999);
+  if (num(s.saved) > 0) out.saved = Math.min(num(s.saved), 9_999_999);
+  if (Array.isArray(s.tags)) {
+    const tags = [...new Set(s.tags.map((x) => str(x, 20).trim()).filter(Boolean))].slice(0, 10);
+    if (tags.length) out.tags = tags;
+  }
+  return out;
+}
 
 /** 読み込んだ JSON(古い版・壊れた物・他人が作った物)を安全な形に直す。直せない記録は捨てる */
 export function normalize(raw: unknown): { data: AppData; dropped: number } {
@@ -43,6 +58,7 @@ export function normalize(raw: unknown): { data: AppData; dropped: number } {
       minutes: Math.min(num(s.minutes), 24 * 60),
       betType: str(s.betType, 40) || undefined,
       memo: str(s.memo, 1000),
+      ...stockFields(s),
       createdAt: num(s.createdAt) || Date.now(),
       updatedAt: num(s.updatedAt) || Date.now(),
     });
@@ -52,6 +68,11 @@ export function normalize(raw: unknown): { data: AppData; dropped: number } {
     monthlyLimit: num(st.monthlyLimit),
     weekStart: st.weekStart === 1 ? 1 : 0,
     winColor: st.winColor === 'blue' ? 'blue' : 'ink',
+    fontScale: st.fontScale === 1.15 || st.fontScale === 1.3 ? st.fontScale : 1,
+    remind: (() => {
+      const r = (st.remind ?? {}) as Record<string, unknown>;
+      return { on: r.on === true, time: typeof r.time === 'string' && TIME.test(r.time) ? r.time : DEFAULT_SETTINGS.remind.time };
+    })(),
   } as AppData['settings'];
   const machines: CounterMachine[] = [];
   for (const m of Array.isArray(r.machines) ? r.machines : []) {
@@ -117,10 +138,10 @@ export function toCsv(list: Session[]) {
     if (/^[=+\-@]/.test(s) && typeof v === 'string') s = "'" + s;
     return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
-  const head = ['日付', '種類', '店舗・場', '機種・レース', '券種', '投資', '回収', '収支', '時間(分)', 'メモ'];
+  const head = ['日付', '種類', '店舗・場', '機種・レース', '券種', '投資', '回収', '収支', '時間(分)', 'レート', '再プレイ', '貯玉・貯メダル', 'タグ', 'メモ'];
   const rows = list.map((s) => [
     s.date, KINDS.find((k) => k.id === s.kind)!.label, s.place, s.target, s.betType ?? '',
-    s.invest, s.payout, s.payout - s.invest, s.minutes, s.memo,
+    s.invest, s.payout, s.payout - s.invest, s.minutes, s.rate ?? '', s.replay ?? '', s.saved ?? '', (s.tags ?? []).join(' '), s.memo,
   ].map(esc).join(','));
   return '﻿' + [head.join(','), ...rows].join('\r\n');
 }

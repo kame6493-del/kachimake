@@ -19,6 +19,7 @@ const GROUPS: { id: GroupKey; label: string; head: string }[] = [
   { id: 'target', label: '機種・レース', head: '機種・レース' },
   { id: 'weekday', label: '曜日', head: '曜日' },
   { id: 'betType', label: '券種', head: '券種' },
+  { id: 'tag', label: '印', head: '印' },
 ];
 
 function range(p: Period): { from: string; to: string } {

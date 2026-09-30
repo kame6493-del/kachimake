@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <application
         android:allowBackup="true"
@@ -25,6 +26,14 @@
 
         </activity>
 
+        <!-- ホーム画面のウィジェット(今月の収支) -->
+        <receiver android:name=".MonthWidget" android:exported="false" android:label="今月の収支">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/kachimake_widget_info" />
+        </receiver>
+
         <!-- AdMob のアプリID。ads-config.json から app/build.gradle 経由で入る -->
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
@@ -45,4 +54,6 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="com.google.android.gms.permission.AD_ID" />
+    <!-- 夜のお知らせは数分ずれても困らない。正確なアラームの権限は外す(Play の申告も不要になる) -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" tools:node="remove" />
 </manifest>

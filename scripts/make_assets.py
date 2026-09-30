@@ -18,8 +18,8 @@ IOS = ROOT / 'ios' / 'App' / 'App' / 'Assets.xcassets'
 
 PAPER = (0xF2, 0xF2, 0xF7)  # 起動画面の地はアプリと同じ明るい灰色
 
-icon = Image.open(SRC / 'icon.png').convert('RGB')
-feature = Image.open(SRC / 'feature.png').convert('RGB')
+icon = Image.open(SRC / 'icon-bright.png').convert('RGB')
+feature = Image.open(SRC / 'feature-bright.png').convert('RGB')
 shot_bg = Image.open(SRC / 'screenshot-bg.png').convert('RGB')
 
 # 地の色は四隅の近くから取る(生成画像はわずかにムラがあるので中央値)

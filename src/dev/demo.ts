@@ -10,6 +10,16 @@ export function installDemo(params: URLSearchParams) {
     ['boat', ['ネット投票', '多摩川'], ['12R', '10R', '8R']],
   ];
   const bets = ['単勝', '馬連・2連複', '3連複', '3連単', 'ワイド・拡連複'];
+  // 印・レート・貯玉は別の乱数で足す(収支の見本の数字を変えないため)
+  let seed2 = 7;
+  const r2 = () => ((seed2 = (seed2 * 48271) % 2147483647), seed2 / 2147483647);
+  const hallExtra = (kind: string, payout: number) => {
+    if (kind !== 'pachinko' && kind !== 'slot') return {};
+    const rate = kind === 'slot' ? 20 : 4;
+    const tags = r2() < 0.3 ? ['イベント日'] : r2() < 0.15 ? ['特定日'] : undefined;
+    const saved = payout > 0 && r2() < 0.4 ? Math.round((payout * 0.3) / rate / 10) * 10 : undefined;
+    return { rate, tags, saved };
+  };
   const sessions = [];
   let id = 0;
   for (let m = 7; m <= 9; m++) {
@@ -26,14 +36,14 @@ export function installDemo(params: URLSearchParams) {
         id: `demo${id}`, date: `2026-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`, kind,
         place: pick(places), target: pick(targets), invest, payout,
         minutes: race ? Math.round(r() * 90) : Math.round((90 + r() * 330) / 10) * 10,
-        betType: race ? pick(bets) : undefined, memo: '', createdAt: id, updatedAt: id,
+        betType: race ? pick(bets) : undefined, memo: '', createdAt: id, updatedAt: id, ...hallExtra(kind, payout),
       });
     }
   }
   // 見本の終盤: 3万円以上の大勝ち(激)と3連勝を入れて、今月をプラスで終える
   const keep = sessions.filter((x) => x.date < '2026-09-24');
   const extra = [
-    { date: '2026-09-24', kind: 'slot', place: '駅前ホール', target: 'ジャグラー', invest: 12000, payout: 58600, minutes: 300 },
+    { date: '2026-09-24', kind: 'slot', place: '駅前ホール', target: 'ジャグラー', invest: 12000, payout: 58600, minutes: 300, rate: 20, saved: 800, tags: ['イベント日'] },
     { date: '2026-09-26', kind: 'keiba', place: '東京競馬場', target: '11R 毎日王冠', invest: 6000, payout: 21900, minutes: 60, betType: '3連複' },
     { date: '2026-09-28', kind: 'pachinko', place: 'パーラー中央', target: '海物語', invest: 15000, payout: 26500, minutes: 240 },
     { date: '2026-09-30', kind: 'slot', place: 'スロット館', target: 'まどマギ', invest: 18000, payout: 34200, minutes: 350 },
@@ -44,7 +54,7 @@ export function installDemo(params: URLSearchParams) {
     ? { machineId: 'sample', games: 3620, counts: { bell: 474, cherry: 112, bonus: 15 } }
     : null;
   localStorage.setItem('CapacitorStorage.kachimake.data.v1', JSON.stringify({
-    version: 1, sessions, settings: { monthlyLimit: 60000, weekStart: 0, winColor: 'ink' }, machines: [], counter,
+    version: 1, sessions, settings: { monthlyLimit: 60000, weekStart: 0, winColor: 'ink', fontScale: Number(params.get('font')) || 1, remind: { on: true, time: '21:30' } }, machines: [], counter,
   }));
   if (params.get('premium') === '1') localStorage.setItem('kachimake.mockPremium', '1');
   else localStorage.removeItem('kachimake.mockPremium');

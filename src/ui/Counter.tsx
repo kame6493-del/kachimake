@@ -3,6 +3,8 @@ import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import type { AppData, CounterMachine, CounterState } from '../domain/types';
 import { expectedSetting, observedDenom, posterior } from '../domain/bayes';
 import { newId } from '../domain/data';
+import { decodeMachine, encodeMachine } from '../domain/nudge';
+import { shareText } from '../platform/files';
 
 interface Props {
   data: AppData;
@@ -11,13 +13,14 @@ interface Props {
   setCounter: (fn: (c: CounterState) => CounterState) => void;
   saveMachine: (m: CounterMachine) => void;
   deleteMachine: (id: string) => void;
+  toast: (msg: string) => void;
 }
 
 const FREE_CUSTOM = 1;
 const tap = () => Haptics.impact({ style: ImpactStyle.Light }).catch(() => {});
 const denomText = (v: number | null) => (v == null ? '—' : `1/${v >= 100 ? Math.round(v) : v.toFixed(1)}`);
 
-export function Counter({ data, premium, onPaywall, setCounter, saveMachine, deleteMachine }: Props) {
+export function Counter({ data, premium, onPaywall, setCounter, saveMachine, deleteMachine, toast }: Props) {
   const machines = data.machines;
   const state: CounterState = data.counter && machines.some((m) => m.id === data.counter!.machineId)
     ? data.counter
@@ -52,6 +55,13 @@ export function Counter({ data, premium, onPaywall, setCounter, saveMachine, del
           {machines.map((m) => <option key={m.id} value={m.id}>{m.name || '(名前なし)'}</option>)}
         </select>
         {machine.id !== 'sample' && <button className="link-btn" onClick={() => setEditing(machine)}>編集</button>}
+        {machine.id !== 'sample' && (
+          <button className="link-btn" onClick={async () => {
+            const r = await shareText(`${machine.name} の確率(カチマケの機種コード)
+${encodeMachine(machine)}`);
+            if (r === 'copied') toast('機種コードをコピーしました。LINE などに貼って渡せます');
+          }}>共有</button>
+        )}
         <button className="link-btn" onClick={newMachine}>機種を追加</button>
       </div>
 
@@ -135,8 +145,21 @@ function MachineEditor({ machine, onClose, onSave, onDelete }: {
   machine: CounterMachine; onClose: () => void; onSave: (m: CounterMachine) => void; onDelete?: () => void;
 }) {
   const [m, setM] = useState<CounterMachine>(structuredClone(machine));
-  const [raw, setRaw] = useState<Record<string, string[]>>(() =>
-    Object.fromEntries(machine.items.map((it) => [it.id, it.denom.map((v) => (v > 1 ? String(v) : ''))])));
+  const [raw, setRaw] = useState<Record<string, string[]>>(() => rawOf(machine));
+  const [code, setCode] = useState('');
+  const [codeErr, setCodeErr] = useState(false);
+  const isNew = !onDelete;
+  const readCode = (v: string) => {
+    setCode(v);
+    if (!v.trim()) return setCodeErr(false);
+    const got = decodeMachine(v, newId);
+    setCodeErr(!got);
+    if (got) {
+      const next = { ...got, id: machine.id };
+      setM(next);
+      setRaw(rawOf(next));
+    }
+  };
   const n = m.settings.length;
 
   const setCount = (c: number) => {
@@ -173,6 +196,14 @@ function MachineEditor({ machine, onClose, onSave, onDelete }: {
           <button className="btn" disabled={!valid} onClick={() => onSave({ ...m, name: m.name.trim(), items: m.items.map((it) => ({ ...it, name: it.name.trim() })) })}>保存</button>
         </div>
         <div className="sheet-body">
+          {isNew && (
+            <label className="field">
+              <span className="field-label">人からもらった機種コードを貼る(なければ下に手で入れる)</span>
+              <textarea rows={2} value={code} placeholder="KM1. から始まる文字" onChange={(e) => readCode(e.target.value)} />
+              {codeErr && <span className="note danger-text">読めないコードでした。最初から最後まで貼ってください</span>}
+              {!codeErr && code.trim() && <span className="note">読み込みました。中身を確かめて保存してください</span>}
+            </label>
+          )}
           <label className="field">
             <span className="field-label">機種名</span>
             <input value={m.name} maxLength={60} onChange={(e) => setM({ ...m, name: e.target.value })} placeholder="例: よく打つ台" />
@@ -207,3 +238,5 @@ function MachineEditor({ machine, onClose, onSave, onDelete }: {
     </div>
   );
 }
+
+const rawOf = (m: CounterMachine) => Object.fromEntries(m.items.map((it) => [it.id, it.denom.map((v) => (v > 1 ? String(v) : ''))]));

@@ -16,6 +16,8 @@ export interface Plan {
   trial: string | null;
   /** 年額を12で割った額の表示(年額のときだけ) */
   perMonth: string | null;
+  /** 数値の価格(割引率の計算用) */
+  amount?: number;
   pkg?: PurchasesPackage;
 }
 
@@ -48,6 +50,7 @@ function toPlans(pkgs: PurchasesPackage[]): Plan[] {
       period: p.packageType === 'MONTHLY' ? 'monthly' : p.packageType === 'ANNUAL' ? 'annual' : 'other',
       trial: intro && intro.price === 0 ? `${intro.periodNumberOfUnits}${unitJa(intro.periodUnit)}無料` : null,
       perMonth: annual && p.product.price > 0 ? perMonthText(p.product.price, p.product.currencyCode) : null,
+      amount: p.product.price,
       pkg: p,
     };
   });
@@ -69,8 +72,8 @@ export async function loadBilling(): Promise<BillingState> {
       status: 'ready',
       premium: localStorage.getItem(MOCK_KEY) === '1',
       plans: [
-        { id: 'annual', title: '年額', price: '¥3,000', period: 'annual', trial: '7日間無料', perMonth: '¥250' },
-        { id: 'monthly', title: '月額', price: '¥400', period: 'monthly', trial: '7日間無料', perMonth: null },
+        { id: 'annual', title: '年額', price: '¥3,000', period: 'annual', trial: '7日間無料', perMonth: '¥250', amount: 3000 },
+        { id: 'monthly', title: '月額', price: '¥400', period: 'monthly', trial: '7日間無料', perMonth: null, amount: 400 },
       ],
     };
   }

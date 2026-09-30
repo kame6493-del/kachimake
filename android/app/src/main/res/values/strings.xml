@@ -4,4 +4,5 @@
     <string name="title_activity_main">カチマケ</string>
     <string name="package_name">jp.kachimake.app</string>
     <string name="custom_url_scheme">jp.kachimake.app</string>
+    <string name="widget_description">今月の収支と回収率をホーム画面に出します</string>
 </resources>

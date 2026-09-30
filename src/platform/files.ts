@@ -31,3 +31,22 @@ export function pickTextFile(accept: string): Promise<string | null> {
     input.click();
   });
 }
+
+/** 文字を人に渡す。端末は共有シート、ブラウザは共有できなければコピー */
+export async function shareText(text: string): Promise<'shared' | 'copied' | 'failed'> {
+  try {
+    if (Capacitor.isNativePlatform()) {
+      await Share.share({ text });
+      return 'shared';
+    }
+    if (navigator.share) {
+      await navigator.share({ text });
+      return 'shared';
+    }
+    await navigator.clipboard.writeText(text);
+    return 'copied';
+  } catch (e) {
+    if (String(e).match(/cancel|abort/i)) return 'shared';
+    try { await navigator.clipboard.writeText(text); return 'copied'; } catch { return 'failed'; }
+  }
+}

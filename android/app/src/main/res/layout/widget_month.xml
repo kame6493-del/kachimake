@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- ホーム画面のウィジェット: 今月の収支 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:background="@drawable/widget_bg">
+    <TextView android:id="@+id/widget_title"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:background="@drawable/widget_head" android:gravity="center"
+        android:paddingTop="5dp" android:paddingBottom="5dp"
+        android:textColor="#FF2B2100" android:textSize="13sp" android:textStyle="bold"
+        android:text="今月の収支"/>
+    <TextView android:id="@+id/widget_amount"
+        android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1"
+        android:gravity="center" android:maxLines="1" android:autoSizeTextType="uniform"
+        android:autoSizeMinTextSize="14sp" android:autoSizeMaxTextSize="30sp"
+        android:paddingLeft="8dp" android:paddingRight="8dp"
+        android:textColor="#FF1F7CF0" android:textStyle="bold" android:text="±¥0"/>
+    <TextView android:id="@+id/widget_meta"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:gravity="center" android:paddingBottom="8dp" android:maxLines="1"
+        android:textColor="#FF8A8A8F" android:textSize="12sp" android:text="タップして記入"/>
+</LinearLayout>

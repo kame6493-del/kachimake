@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import type { BillingState, Plan } from '../platform/billing';
 
+/** 3回目の記入の後に1回だけ出す案内。why にこの値が来たら見出しを変える */
+export const INTRO = '__intro';
+
 interface Props {
   why: string;
   billing: BillingState;
@@ -11,14 +14,29 @@ interface Props {
   reward: { left: number; busy: boolean; onWatch: () => void } | null;
 }
 
-const FEATURES = [
-  ['3か月・今年・全期間の分析', '累計の推移と月ごとの収支を、長い期間で見られます'],
-  ['店舗・機種・曜日・券種ごとの収支', 'どの店、どの台、どの買い方で負けているかが表になります'],
-  ['設定の推測', '数えた小役から、設定ごとの確率を計算します'],
-  ['機種の登録数', '無料は1台まで。有料は制限なし'],
-  ['CSVの書き出し', '表計算ソフトで集計し直せます'],
-  ['広告なし', '分析と設定の画面の下に出る広告が消えます'],
+/** 無料と有料の比べ表。true=使える / 文字=条件付き */
+const TABLE: [string, boolean | string, boolean | string][] = [
+  ['記入・カレンダー', true, true],
+  ['今月・先月の分析', true, true],
+  ['負けの上限・シェア画像', true, true],
+  ['3か月・今年・全期間の分析', false, true],
+  ['店舗・機種・曜日・券種・印ごとの収支', false, true],
+  ['小役カウンター', '1台まで', '制限なし'],
+  ['設定の推測', false, true],
+  ['CSVの書き出し', false, true],
+  ['広告', 'あり', 'なし'],
 ];
+
+const cell = (v: boolean | string) => (v === true ? <span className="yes" aria-label="使える">○</span> : v === false ? <span className="no" aria-label="使えない">—</span> : v);
+
+/** 年額が月額12か月よりどれだけ安いか(整数の%) */
+export function saving(plans: Plan[]): number | null {
+  const a = plans.find((p) => p.period === 'annual')?.amount;
+  const m = plans.find((p) => p.period === 'monthly')?.amount;
+  if (!a || !m) return null;
+  const r = Math.floor((1 - a / (m * 12)) * 100);
+  return r > 0 ? r : null;
+}
 
 export function Paywall({ why, billing, onBuy, onRestore, onClose, reward }: Props) {
   const [busy, setBusy] = useState(false);
@@ -28,6 +46,9 @@ export function Paywall({ why, billing, onBuy, onRestore, onClose, reward }: Pro
     : [];
   const [sel, setSel] = useState<string>('');
   const chosen = plans.find((p) => p.id === sel) ?? plans[0];
+  const off = saving(plans);
+  const trial = plans.find((p) => p.trial)?.trial;
+  const intro = why === INTRO;
 
   const run = async (f: () => Promise<void>) => {
     setBusy(true);
@@ -39,16 +60,29 @@ export function Paywall({ why, billing, onBuy, onRestore, onClose, reward }: Pro
     <div className="sheet-backdrop" onClick={onClose}>
       <div className="sheet paywall" role="dialog" aria-modal="true" aria-label="有料プラン" onClick={(e) => e.stopPropagation()}>
         <div className="sheet-head">
-          <button className="link-btn" onClick={onClose}>閉じる</button>
+          <button className="link-btn" onClick={onClose}>{intro ? 'あとで' : '閉じる'}</button>
           <h2 className="mincho">有料プラン</h2>
           <span />
         </div>
         <div className="sheet-body">
-          <p className="pw-why">「{why}」は有料プランで使えます。</p>
-          <ul className="pw-list">
-            {FEATURES.map(([t, d]) => <li key={t}><strong>{t}</strong><span>{d}</span></li>)}
-          </ul>
-          <p className="note">記入・カレンダー・今月と先月の分析・負けの上限・バックアップは、ずっと無料です。</p>
+          <div className="pw-hero">
+            {trial && <span className="pw-trial-badge">{trial}</span>}
+            <p className="pw-title">{intro ? '記入おつかれさまです' : `「${why}」は有料プランで使えます`}</p>
+            <p className="pw-sub">
+              {intro
+                ? 'どの店・どの台・どの買い方で負けているか。3回記入した今から、全部の分析を試せます。'
+                : 'どこで勝ち、どこで負けているかが、表とグラフで分かります。'}
+            </p>
+          </div>
+
+          <table className="pw-table">
+            <thead><tr><th scope="col" /><th scope="col">無料</th><th scope="col" className="pro">有料</th></tr></thead>
+            <tbody>
+              {TABLE.map(([name, free, pro]) => (
+                <tr key={name}><th scope="row">{name}</th><td>{cell(free)}</td><td className="pro">{cell(pro)}</td></tr>
+              ))}
+            </tbody>
+          </table>
 
           {billing.status === 'unavailable' ? (
             <p className="state-line">{billing.reason}</p>
@@ -59,16 +93,19 @@ export function Paywall({ why, billing, onBuy, onRestore, onClose, reward }: Pro
               <div className="plans" role="radiogroup" aria-label="プラン">
                 {plans.map((p) => (
                   <button key={p.id} role="radio" aria-checked={chosen?.id === p.id} className={`plan ${chosen?.id === p.id ? 'on' : ''}`} onClick={() => setSel(p.id)}>
+                    {p.period === 'annual' && off && <span className="plan-off">{off}%おトク</span>}
                     <span className="plan-name">{p.period === 'annual' ? '年額' : p.period === 'monthly' ? '月額' : p.title}</span>
-                    <span className="plan-price">{p.price}{p.period === 'annual' ? ' / 年' : p.period === 'monthly' ? ' / 月' : ''}</span>
-                    {p.perMonth && <span className="plan-note">月あたり {p.perMonth}</span>}
-                    {p.trial && <span className="plan-trial">{p.trial}</span>}
+                    {p.perMonth
+                      ? <><span className="plan-price">月{p.perMonth}</span><span className="plan-note">1年 {p.price} をまとめて</span></>
+                      : <span className="plan-price">{p.price}{p.period === 'monthly' ? ' / 月' : ''}</span>}
+                    {p.trial && <span className="plan-trial">最初の{p.trial}</span>}
                   </button>
                 ))}
               </div>
               <button className="btn wide" disabled={busy || !chosen} onClick={() => chosen && run(() => onBuy(chosen))}>
                 {busy ? '処理中' : chosen?.trial ? `${chosen.trial}で試す` : `${chosen?.price ?? ''}で購入する`}
               </button>
+              {chosen?.trial && <p className="note center">無料期間中に解約すれば、料金はかかりません</p>}
             </>
           )}
           {err && <p className="error">{err}</p>}

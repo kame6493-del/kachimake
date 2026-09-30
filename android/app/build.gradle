@@ -7,8 +7,8 @@ android {
         applicationId "jp.kachimake.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 4
-        versionName "1.0.0"
+        versionCode 5
+        versionName "1.1.0"
         // AdMob の ID はここから読む(唯一の置き場所は ads-config.json)
         manifestPlaceholders = [admobAppId: new groovy.json.JsonSlurper().parse(rootProject.file("../ads-config.json")).android.appId]
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
