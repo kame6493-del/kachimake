@@ -78,9 +78,10 @@ export function CumulativeChart({ points }: { points: { date: string; total: num
             <text x={PAD.l - 6} y={geo.y(t) + 3.5} className="tick" textAnchor="end">{shortYen(t)}</text>
           </g>
         ))}
+        {/* 深緑の地に赤を半透明で重ねると茶色になるので、負けの側は面を塗らず、線の色で分ける */}
         <path d={geo.area} className="area-plus" clipPath={`url(#${id}a)`} />
-        <path d={geo.area} className="area-minus" clipPath={`url(#${id}b)`} />
-        <path d={geo.line} className="line" fill="none" />
+        <path d={geo.line} className="line line-plus" fill="none" clipPath={`url(#${id}a)`} />
+        <path d={geo.line} className="line line-minus" fill="none" clipPath={`url(#${id}b)`} />
         {hover != null && (
           <g>
             <line x1={geo.x(hover)} x2={geo.x(hover)} y1={PAD.t} y2={H - PAD.b} className="cursor" />

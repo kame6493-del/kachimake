@@ -141,3 +141,34 @@ export function limitStatus(list: Session[], month: string, limit: number) {
   const lost = Math.max(0, -list.filter((s) => s.date.startsWith(month)).reduce((a, s) => a + profit(s), 0));
   return { spent, lost, limit, ratio: lost / limit };
 }
+
+/** 直近から数えた連勝・連敗(日ごとの収支で判定。±0 の日は数えずに飛ばす) */
+export function streak(list: Session[]): { kind: 'win' | 'lose'; n: number } | null {
+  const days = [...byDate(list).entries()].filter(([, p]) => p !== 0).sort((a, b) => (a[0] < b[0] ? 1 : -1));
+  if (days.length === 0) return null;
+  const kind = days[0][1] > 0 ? 'win' : 'lose';
+  let n = 0;
+  for (const [, p] of days) {
+    if ((p > 0 ? 'win' : 'lose') !== kind) break;
+    n++;
+  }
+  return { kind, n };
+}
+
+/** 回収率から付ける今月の称号 */
+export function title(recovery: number | null): string | null {
+  if (recovery == null) return null;
+  if (recovery >= 1.5) return '神回収';
+  if (recovery >= 1.2) return '勝ち組';
+  if (recovery >= 1.0) return 'プラス圏';
+  if (recovery >= 0.8) return 'あと一歩';
+  return '修行中';
+}
+
+/** 記入したときの演出の強さ */
+export function hype(p: number): 'jackpot' | 'big' | 'win' | null {
+  if (p >= 50000) return 'jackpot';
+  if (p >= 10000) return 'big';
+  if (p > 0) return 'win';
+  return null;
+}

@@ -2,7 +2,7 @@
   "appId": "jp.kachimake.app",
   "appName": "カチマケ",
   "webDir": "dist",
-  "backgroundColor": "#f6f4ee",
+  "backgroundColor": "#0f2a20",
   "ios": { "contentInset": "never" },
   "android": { "allowMixedContent": false }
 }

@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import type { AppData, Session } from '../domain/types';
 import { kindInfo } from '../domain/types';
-import { byDate, inRange, limitStatus, profit, summarize } from '../domain/stats';
+import { byDate, inRange, limitStatus, profit, streak, summarize, title } from '../domain/stats';
 import { addMonths, monthRange, pad, today } from '../domain/data';
 import { dateJa, hours, monthJa, pct, shortYen, signedYen, tone, yen } from './format';
 
@@ -19,6 +19,8 @@ export function Home({ data, month, setMonth, selected, setSelected, onEdit, onA
   const { from, to } = monthRange(month);
   const monthList = useMemo(() => inRange(data.sessions, from, to), [data.sessions, from, to]);
   const sum = useMemo(() => summarize(monthList), [monthList]);
+  const rank = title(sum.recovery);
+  const run = useMemo(() => streak(data.sessions), [data.sessions]);
   const daily = useMemo(() => byDate(monthList), [monthList]);
   const limit = limitStatus(data.sessions, month, data.settings.monthlyLimit);
   const dayList = data.sessions.filter((s) => s.date === selected);
@@ -46,7 +48,11 @@ export function Home({ data, month, setMonth, selected, setSelected, onEdit, onA
         </div>
 
         <div className="closing">
-          <div className="closing-label">{m}月の収支</div>
+          <div className="closing-label">
+            <span>{m}月の収支</span>
+            {rank && <span className={`rank ${sum.profit >= 0 ? 'up' : 'down'}`}>{rank}</span>}
+            {isThisMonth && run && run.n >= 2 && <span className={`run ${run.kind}`}>{run.n}{run.kind === 'win' ? '連勝中' : '連敗中'}</span>}
+          </div>
           <div className={`closing-amount ${tone(sum.profit)}`}>{signedYen(sum.profit)}</div>
           <div className="closing-meta">
             {sum.count === 0 ? <span>まだ記入がありません</span> : (
@@ -63,7 +69,7 @@ export function Home({ data, month, setMonth, selected, setSelected, onEdit, onA
           <div className={`limit ${limit.ratio >= 1 ? 'over' : ''}`}>
             <div className="limit-text">
               {limit.ratio >= 1
-                ? <>負けが上限 {yen(limit.limit)} を超えました{isThisMonth ? '。今日はここまでにしませんか' : ''}</>
+                ? <>負けが上限 {yen(limit.limit)} を超えました</>
                 : <>負けの上限 {yen(limit.limit)}<span className="muted"> あと {yen(Math.max(0, limit.limit - limit.lost))}</span></>}
             </div>
             <div className="limit-track" role="meter" aria-valuemin={0} aria-valuemax={limit.limit} aria-valuenow={limit.lost} aria-label="負けの上限に対する今月の負け">
@@ -83,10 +89,11 @@ export function Home({ data, month, setMonth, selected, setSelected, onEdit, onA
               <tr key={w}>
                 {cells.slice(w * 7, w * 7 + 7).map((d, i) =>
                   d ? (
-                    <td key={d} className={`${d === selected ? 'sel' : ''} ${d === t ? 'today' : ''}`}>
+                    <td key={d} className={`${d === selected ? 'sel' : ''} ${d === t ? 'today' : ''} ${(daily.get(d) ?? 0) >= 30000 ? 'hot' : (daily.get(d) ?? 0) > 0 ? 'won' : ''}`}>
                       <button onClick={() => setSelected(d)} aria-pressed={d === selected}
                         aria-label={`${dateJa(d)}${daily.has(d) ? ` ${signedYen(daily.get(d)!)}` : ''}`}>
                         <span className="cal-day">{Number(d.slice(8))}</span>
+                        {(daily.get(d) ?? 0) >= 30000 && <span className="hot-mark" aria-hidden="true">激</span>}
                         <span className={`cal-amt ${daily.has(d) ? tone(daily.get(d)!) : ''}`}>{daily.has(d) ? shortYen(daily.get(d)!) : ''}</span>
                       </button>
                     </td>

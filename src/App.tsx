@@ -12,6 +12,8 @@ import { Analysis } from './ui/Analysis';
 import { Counter } from './ui/Counter';
 import { SettingsPage } from './ui/SettingsPage';
 import { SessionForm } from './ui/SessionForm';
+import { Celebrate, type Hype } from './ui/Celebrate';
+import { hype } from './domain/stats';
 import { Paywall } from './ui/Paywall';
 
 type Tab = 'home' | 'analysis' | 'counter' | 'settings';
@@ -61,6 +63,12 @@ export default function App() {
   const [unlockUntil, setUnlockUntil] = useState(() => Number(readLocal(UNLOCK_KEY)) || 0);
   const [now, setNow] = useState(() => Date.now());
   const [rewardBusy, setRewardBusy] = useState(false);
+  const [celebrate, setCelebrate] = useState<{ kind: Hype; amount: number } | null>(() => {
+    // 開発時だけ: ?celebrate=jackpot などで演出を撮影できる
+    const c = import.meta.env.DEV ? new URLSearchParams(location.search).get('celebrate') : null;
+    return c === 'jackpot' || c === 'big' || c === 'win' ? { kind: c, amount: c === 'jackpot' ? 58600 : c === 'big' ? 16200 : 3500 } : null;
+  });
+  const endCelebrate = useCallback(() => setCelebrate(null), []);
 
   useEffect(() => {
     loadData().then(setData).catch(() => setData(emptyData()));
@@ -135,7 +143,10 @@ export default function App() {
     setForm(null);
     setSelected(s.date);
     setMonth(s.date.slice(0, 7));
-    toast(exists ? '直しました' : '記入しました');
+    // 新しく記入した勝ちだけ演出する(直したときや負けの記入では出さない)
+    const h = exists ? null : hype(s.payout - s.invest);
+    if (h) setCelebrate({ kind: h, amount: s.payout - s.invest });
+    else toast(exists ? '直しました' : '記入しました');
   };
   const remove = (id: string) => {
     mutate((d) => ({ ...d, sessions: d.sessions.filter((x) => x.id !== id) }));
@@ -249,6 +260,7 @@ export default function App() {
           reward={ads.allowed && !premium ? { left: rewardLeft, busy: rewardBusy, onWatch: watchReward } : null} />
       )}
       {toastMsg && <div className="toast" role="status">{toastMsg}</div>}
+      {celebrate && <Celebrate kind={celebrate.kind} amount={celebrate.amount} onDone={endCelebrate} />}
     </div>
   );
 }

@@ -10,16 +10,33 @@ from PIL import Image, ImageDraw, ImageFont
 
 ROOT = Path(__file__).resolve().parent.parent
 A = ROOT / 'store-assets'
-INK = (0x1B, 0x1A, 0x17)
-SUMI2 = (0x6F, 0x6A, 0x5F)
+INK = (0xF7, 0xC9, 0x48)  # 見出しは金
+SUMI2 = (0xC9, 0xD8, 0xCF)
 
 SHOTS = [
-    ('home', '今月いくらか、開けば分かる', '投資と回収を入れるだけ。赤字は朱、黒字は墨'),
+    ('home', '今月いくら勝ったか、ひと目で', '投資と回収を入れるだけ。称号と連勝も出る'),
     ('analysis', '回収率も時給も、1画面で', '累計の推移・種類ごと・店や機種ごとの収支'),
     ('counter', '数えた小役から、設定を推測', 'ホールの中でも押しやすい大きなボタン'),
+    ('celebrate', '勝った日は、派手に祝う', '1万円以上で「大勝!」、5万円以上で「激アツ!!」'),
 ]
 
-src_bg = Image.open(A / 'screenshot-bg-1242x2688.png').convert('RGB')
+def turf_bg(W: int, H: int) -> Image.Image:
+    """アプリと同じ深緑の地に、上から光が当たったような明るみと、金の二重線を引いた下地"""
+    import math
+    img = Image.new('RGB', (W, H))
+    px = img.load()
+    for y in range(H):
+        for x in range(0, W):
+            d = math.hypot((x - W / 2) / W, (y + H * 0.1) / (H * 0.55))
+            t = max(0.0, min(1.0, 1 - d))
+            px[x, y] = (int(11 + (26 - 11) * t), int(33 + (90 - 33) * t), int(24 + (65 - 24) * t))
+    d = ImageDraw.Draw(img)
+    y = round(H * 0.18)
+    x0, x1 = round(W * 0.08), round(W * 0.92)
+    th = max(2, round(W / 400))
+    d.rectangle((x0, y - th, x1, y), fill=INK)
+    d.rectangle((x0, y + 3 * th, x1, y + 4 * th), fill=INK)
+    return img
 
 # (ストア, 幅, 高さ)。Google Play は 9:16 か 16:9 だけ受け付ける
 TARGETS = [('appstore', 1242, 2688), ('appstore69', 1320, 2868), ('play', 1080, 1920)]
@@ -27,12 +44,11 @@ TARGETS = [('appstore', 1242, 2688), ('appstore69', 1320, 2868), ('play', 1080, 
 
 def make(store: str, W: int, H: int):
     # 下地は幅を合わせて縮め、上から高さぶんを使う(二重線は上18%にあるので残る)
-    bg = src_bg.resize((W, round(src_bg.height * W / src_bg.width)), Image.LANCZOS).crop((0, 0, W, H))
+    bg = turf_bg(W, H)
     k = W / 1242
     mincho = ImageFont.truetype('C:/Windows/Fonts/yumindb.ttf', round(76 * k))
     subf = ImageFont.truetype('C:/Windows/Fonts/YuGothM.ttc', round(40 * k))
-    gray = bg.convert('L')
-    rule_y = next(y for y in range(round(200 * k), H // 2) if sum(gray.getpixel((x, y)) for x in range(round(300 * k), round(900 * k), 20)) / len(range(round(300 * k), round(900 * k), 20)) < 90)
+    rule_y = round(H * 0.18)
     for i, (name, head, sub) in enumerate(SHOTS, 1):
         _one(store, W, H, bg, rule_y, mincho, subf, i, name, head, sub)
 
@@ -55,7 +71,7 @@ def _one(store, W, H, bg, rule_y, MINCHO, SUB, i, name, head, sub):
     shot = shot.resize((sw, sh), Image.LANCZOS)
     x = (W - sw) // 2
     img.paste(shot, (x, top))
-    d.rectangle((x - 1, top - 1, x + sw, top + sh), outline=INK, width=2)
+    d.rectangle((x - 2, top - 2, x + sw + 1, top + sh + 1), outline=INK, width=3)
     out = A / f'{store}-{i}-{name}-{W}x{H}.png'
     img.save(out)
     print(out.name, 'image', shot.size)

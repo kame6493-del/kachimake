@@ -30,6 +30,16 @@ export function installDemo(params: URLSearchParams) {
       });
     }
   }
+  // 見本の終盤: 3万円以上の大勝ち(激)と3連勝を入れて、今月をプラスで終える
+  const keep = sessions.filter((x) => x.date < '2026-09-24');
+  const extra = [
+    { date: '2026-09-24', kind: 'slot', place: '駅前ホール', target: 'ジャグラー', invest: 12000, payout: 58600, minutes: 300 },
+    { date: '2026-09-26', kind: 'keiba', place: '東京競馬場', target: '11R 毎日王冠', invest: 6000, payout: 21900, minutes: 60, betType: '3連複' },
+    { date: '2026-09-28', kind: 'pachinko', place: 'パーラー中央', target: '海物語', invest: 15000, payout: 26500, minutes: 240 },
+    { date: '2026-09-30', kind: 'slot', place: 'スロット館', target: 'まどマギ', invest: 18000, payout: 34200, minutes: 350 },
+  ].map((x) => { id++; return { id: `demo${id}`, memo: '', createdAt: id, updatedAt: id, betType: undefined, ...x }; });
+  sessions.length = 0;
+  sessions.push(...keep, ...extra);
   const counter = params.get('tab') === 'counter'
     ? { machineId: 'sample', games: 3620, counts: { bell: 474, cherry: 112, bonus: 15 } }
     : null;

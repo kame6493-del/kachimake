@@ -147,3 +147,25 @@ describe('dates / csv', () => {
     expect(csv).toContain(',-5000,');
   });
 });
+
+import { hype, streak, title } from './stats';
+describe('streak / title / hype', () => {
+  it('直近から同じ向きの日を数え、±0 の日は飛ばす', () => {
+    const list = [s('2026-09-01', 100, 0), s('2026-09-02', 0, 500), s('2026-09-03', 100, 100), s('2026-09-04', 0, 900)];
+    expect(streak(list)).toEqual({ kind: 'win', n: 2 });
+    expect(streak([])).toBeNull();
+  });
+  it('称号は回収率の段階で決まる', () => {
+    expect(title(1.6)).toBe('神回収');
+    expect(title(1.0)).toBe('プラス圏');
+    expect(title(0.5)).toBe('修行中');
+    expect(title(null)).toBeNull();
+  });
+  it('演出は勝ちのときだけ、額で強さが変わる', () => {
+    expect(hype(-1)).toBeNull();
+    expect(hype(0)).toBeNull();
+    expect(hype(3000)).toBe('win');
+    expect(hype(10000)).toBe('big');
+    expect(hype(50000)).toBe('jackpot');
+  });
+});
