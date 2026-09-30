@@ -21,8 +21,8 @@ SHOTS = [
 
 src_bg = Image.open(A / 'screenshot-bg-1242x2688.png').convert('RGB')
 
-# (ストア, 幅, 高さ)。Google Play は縦横比2:1まで
-TARGETS = [('appstore', 1242, 2688), ('appstore69', 1320, 2868), ('play', 1080, 2160)]
+# (ストア, 幅, 高さ)。Google Play は 9:16 か 16:9 だけ受け付ける
+TARGETS = [('appstore', 1242, 2688), ('appstore69', 1320, 2868), ('play', 1080, 1920)]
 
 
 def make(store: str, W: int, H: int):

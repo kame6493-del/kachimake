@@ -1,14 +1,14 @@
 {
-  "_comment": "AdMob の ID はここだけで持つ。下は Google 公開のテスト用 ID。公開前に AdMob で作った ID に全部差し替え、useTestAds を false にする。Android は app/build.gradle が、iOS は scripts/sync-ios-ads.mjs が読む。",
+  "_comment": "AdMob の ID はここだけで持つ。ID は AdMob で作った本物(2026-09-30)。useTestAds が true の間は本物の ID でもテスト広告だけが出る(開発・内部テスト用)。本番公開の AAB/IPA を作る前に false にする。Android は app/build.gradle が、iOS は scripts/sync-ios-ads.mjs が読む。",
   "useTestAds": true,
   "android": {
-    "appId": "ca-app-pub-3940256099942544~3347511713",
-    "bannerId": "ca-app-pub-3940256099942544/9214589741",
-    "rewardedId": "ca-app-pub-3940256099942544/5224354917"
+    "appId": "ca-app-pub-9843093495011329~9205361542",
+    "bannerId": "ca-app-pub-9843093495011329/2713028828",
+    "rewardedId": "ca-app-pub-9843093495011329/9888811265"
   },
   "ios": {
-    "appId": "ca-app-pub-3940256099942544~1458002511",
-    "bannerId": "ca-app-pub-3940256099942544/2435281174",
-    "rewardedId": "ca-app-pub-3940256099942544/1712485313"
+    "appId": "ca-app-pub-9843093495011329~7516789630",
+    "bannerId": "ca-app-pub-9843093495011329/7262647924",
+    "rewardedId": "ca-app-pub-9843093495011329/5074544844"
   }
 }

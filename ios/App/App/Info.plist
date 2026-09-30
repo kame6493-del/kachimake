@@ -24,7 +24,7 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<!-- AdMob のアプリID。npm run sync のたびに ads-config.json から書き直す(scripts/sync-ios-ads.mjs) -->
 	<key>GADApplicationIdentifier</key>
-	<string>ca-app-pub-3940256099942544~1458002511</string>
+	<string>ca-app-pub-9843093495011329~7516789630</string>
 	<key>SKAdNetworkItems</key>
 	<array>
 		<dict>
