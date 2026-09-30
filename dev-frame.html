@@ -1,0 +1,4 @@
+<!doctype html>
+<!-- ストアの画面写真を撮るための枠。開発サーバーでだけ使う(vite build の入口は index.html だけなので本番には入らない) -->
+<html><head><meta charset="utf-8"><style>html,body{margin:0;background:#000}iframe{display:block;width:390px;height:844px;border:0}</style></head>
+<body><iframe id="f"></iframe><script>document.getElementById('f').src='/'+location.search;</script></body></html>

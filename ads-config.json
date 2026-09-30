@@ -1,0 +1,14 @@
+{
+  "_comment": "AdMob の ID はここだけで持つ。下は Google 公開のテスト用 ID。公開前に AdMob で作った ID に全部差し替え、useTestAds を false にする。Android は app/build.gradle が、iOS は scripts/sync-ios-ads.mjs が読む。",
+  "useTestAds": true,
+  "android": {
+    "appId": "ca-app-pub-3940256099942544~3347511713",
+    "bannerId": "ca-app-pub-3940256099942544/9214589741",
+    "rewardedId": "ca-app-pub-3940256099942544/5224354917"
+  },
+  "ios": {
+    "appId": "ca-app-pub-3940256099942544~1458002511",
+    "bannerId": "ca-app-pub-3940256099942544/2435281174",
+    "rewardedId": "ca-app-pub-3940256099942544/1712485313"
+  }
+}
