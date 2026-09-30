@@ -1,61 +1,57 @@
-# カチマケ 公開までの手順
+# カチマケ 公開までの状態と手順
 
-2026-09-30 時点。コード・テスト・本番ビルド・Android のデバッグ版 APK までは済み。
-残りは、ストアと課金の管理画面での作業(人の手が要る)と、実機での確認。
+2026-09-30 21:40 時点。
 
-## 済んでいること
+## 済んだこと
 
-| 項目 | 状態 |
-|---|---|
-| 計算のテスト(集計・累計・種類別・設定推測・読み込みの検査・CSV) | 20件すべて通過 `npm test` |
-| 型チェック・本番ビルド | 通過 `npm run build` |
-| ブラウザでの動作(スマホ幅390px / PC幅) | 記入→保存→集計、疑似購入→有料の表示、連打525回の取りこぼし0、空の状態、本番ビルドでエラー0 |
-| Android デバッグ版 | `android/app/build/outputs/apk/debug/app-debug.apk` |
-| iOS プロジェクト | `ios/` を生成済み(Mac の Xcode で開く) |
+### アプリ
+- 記入・分析・小役カウンター・有料プラン(RevenueCat)・広告(AdMob バナー+リワード)
+- テスト 26 件、iOS はクラウド Mac で署名なしのコンパイルが成功
+- 公開用の署名鍵(カチマケ専用): `%LOCALAPPDATA%\KachimakeBuild\signing\`。パスワードは DPAPI で暗号化。PC を替える前にこのフォルダごと控える
+- 署名済み AAB: `releases/kachimake-release.aab`(バージョンコード 2)
 
-## 確かめていないこと
+### Google Play(アプリ ID 4972528434268094575、パッケージ jp.kachimake.app)
+- 内部テストに 2 (1.0.0) を公開済み。テスター: kame6493@gmail.com
+- 参加リンク: https://play.google.com/apps/internaltest/4700174068659233412
+- ストア掲載(名前・説明・アイコン・横長画像・画面写真3枚)、カテゴリ「ファイナンス」、連絡先
+- アプリのコンテンツ 10 件すべて申告済み(レーティングは IARC 18 歳以上、対象年齢 18 歳以上)
 
-- 実機(Android・iPhone)での起動と、戻るボタン・触覚フィードバック・共有シート
-- 実際のストア課金(RevenueCat のキーが未設定のため、いまは購入ボタンが「購入の準備中です」になる)
+### AdMob(パブリッシャー pub-9843093495011329)
+| | アプリ ID | バナー | リワード |
+|---|---|---|---|
+| Android | ~9205361542 | /2713028828 | /9888811265 |
+| iOS | ~7516789630 | /7262647924 | /5074544844 |
+- `ads-config.json` に入れてある。`useTestAds: true`(本物の ID でもテスト広告が出る)。本番公開の前に false にして作り直す
+- app-ads.txt: https://kame6493-del.github.io/app-ads.txt
 
-## 1. 課金の準備(RevenueCat)
+### 公開ページ(GitHub Pages)
+- https://kame6493-del.github.io/kachimake-site/ (サポート・プライバシーポリシー・利用規約)
 
-1. RevenueCat でプロジェクトを作り、iOS と Android のアプリを登録する
-2. Entitlement を `premium` の名前で1つ作る(コードの `ENTITLEMENT` と同じ名前)
-3. ストアに商品を作る(自動更新サブスクリプション、同じグループ)
-   | 商品ID | 期間 | 価格案 | 無料期間 |
-   |---|---|---|---|
-   | `kachimake_monthly` | 1か月 | ¥400 | 7日 |
-   | `kachimake_annual` | 1年 | ¥3,000 | 7日 |
-4. RevenueCat の Offering(current)に Monthly と Annual の Package として入れ、両方を `premium` に結びつける
-5. RevenueCat の公開APIキー(iOS 用と Android 用)を `src/platform/billing.ts` の `API_KEYS` に入れる
-6. `npm run sync` のあと、各ストアのテスト用アカウントで購入・復元・解約を試す
+### GitHub
+- 非公開: kame6493-del/kachimake(アプリのコード。iOS のクラウドビルドもここ)
+- 公開: kame6493-del/kachimake-site、kame6493-del/kame6493-del.github.io
 
-## 2. 公開前に埋める所
+## 持ち主がやること(順番どおり)
 
-- `public/privacy.html` の「お問い合わせ先」(いまは「公開前に記入」)
-- プライバシーポリシーと利用規約を公開 URL に置き、ストアの登録画面に入れる
-- (済)アイコン・スプラッシュ・ストア画像は `store-assets/` に作成済み。元画像は GPT-image-2 製(`store-assets/source/`)。
-  作り直すときは元画像を差し替えて `python scripts/make_assets.py` → `python scripts/make_screenshots.py`。
-  画面写真の撮り直しは、開発サーバーで `dev-frame.html?demo=1&tab=analysis&premium=1` を開いて撮る(本番には入らない)。
+1. 内部テストで動作確認: スマホで上の参加リンクを開いて入れる。記入・分析・広告(テスト広告)・リワードを試す
+2. Play の「Google Payments 販売アカウント」を作る(Play Console →「Google Play で収益化する」→ 販売アカウントをセットアップ)。銀行口座などお金の情報なので本人が入れる
+3. RevenueCat のアカウントを作る(https://app.revenuecat.com)。作れたら知らせる → Claude がプロジェクト・アプリ・entitlement `premium`・Offering を作る
+4. Play の商品(販売アカウントの後): Claude が `kachimake_monthly`(¥400)・`kachimake_annual`(¥3,000)を 7 日無料で作る
+5. RevenueCat と Play をつなぐ「サービスアカウントの JSON」を Google Cloud で作って RevenueCat に上げる(鍵なので本人)
+6. クローズドテスト: 新しい個人アカウントは、12 人以上が 14 日続けて参加しないと本番を申請できない。テスターのメールアドレスを集める
+7. iOS: Apple Developer Program が有効なら、App Store Connect にアプリ(Bundle ID `jp.kachimake.app`)を作り、GitHub の kachimake リポジトリにシークレット4つ(ASC_KEY_ID / ASC_ISSUER_ID / APPLE_TEAM_ID / ASC_KEY_P8_BASE64)を入れる。DIAMOND NINE で作った App Store Connect の API キーをそのまま使える
 
-## 3. Android のビルド
+## 作り直すとき
 
-プロジェクトのパスに日本語があると Gradle が止まるため、一時ドライブで組み立てる。
-JDK と SDK は DIAMOND NINE 用に入っている物を使う。
-
-```powershell
-$root = Join-Path $env:LOCALAPPDATA 'Packages\OpenAI.Codex_2p2nqsd0c76g0\LocalCache\Local\DiamondNineBuild'
-$env:JAVA_HOME = (Get-ChildItem "$root\java" -Directory | Select-Object -First 1).FullName
-$env:ANDROID_HOME = "$root\android-sdk"
-subst K: "C:\Users\yuichi1\Downloads\カチマケ_2026-09-30"
-Start-Process K:\kachimake\android\gradlew.bat -ArgumentList 'bundleRelease' -WorkingDirectory K:\kachimake\android -NoNewWindow -Wait
-subst K: /D
+```
+npm run sync                                   # ビルドして android/ios へ反映
+powershell -File scripts/build-android.ps1     # 署名済み AAB(versionCode は android/app/build.gradle)
+python scripts/make_assets.py                  # アイコン・起動画面・ストア画像
+python scripts/make_screenshots.py             # 画面写真(先に dev-frame.html?demo=1 で raw を撮る)
 ```
 
-リリース版の署名鍵は DIAMOND NINE とは別に作る(同じ鍵を使い回さない)。
+## 注意
 
-## 4. 注意
-
-- この環境の Node は `fs.rmSync` / `cpSync` の再帰処理で exit 127 のまま無言で落ちる。`npm run build` は `scripts/clean-dist.mjs` で先に dist を消してから組み立てる。
-- ストアの年齢区分は「頻繁/極度のギャンブルの模擬」ではなく「ギャンブルに関する情報」に当たる。本アプリは賭けそのものを提供しない。審査では、記録のための道具であることを説明文に書く。
+- この環境の Node は `fs.rmSync` / `cpSync` の再帰処理で exit 127 のまま無言で落ちる。`npm run build` は `scripts/clean-dist.mjs` で先に dist を消す
+- プロジェクトのパスに日本語があると Gradle が止まる。build-android.ps1 は subst K: で組む
+- 本番公開の前に `useTestAds` を false にする(しないと本番でもテスト広告のまま、収益が出ない)
