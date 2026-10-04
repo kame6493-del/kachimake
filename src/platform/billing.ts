@@ -5,7 +5,7 @@ import { Purchases, type PurchasesPackage } from '@revenuecat/purchases-capacito
  * RevenueCat の公開APIキー(秘密鍵ではない)。ダッシュボードで作ったら入れる。
  * 空のままなら購入ボタンは「準備中」になり、課金は一切走らない。
  */
-const API_KEYS = { ios: '', android: '' };
+const API_KEYS = { ios: 'appl_VYQKpXaXwDEufuFTueeiwZhyhdq', android: '' };
 export const ENTITLEMENT = 'premium';
 
 export interface Plan {
