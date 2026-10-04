@@ -1,6 +1,6 @@
 {
   "_comment": "AdMob の ID はここだけで持つ。ID は AdMob で作った本物(2026-09-30)。useTestAds が true の間は本物の ID でもテスト広告だけが出る(開発・内部テスト用)。本番公開の AAB/IPA を作る前に false にする。Android は app/build.gradle が、iOS は scripts/sync-ios-ads.mjs が読む。",
-  "useTestAds": true,
+  "useTestAds": false,
   "android": {
     "appId": "ca-app-pub-9843093495011329~9205361542",
     "bannerId": "ca-app-pub-9843093495011329/2713028828",
