@@ -1,0 +1,30 @@
+1. Screen recording: attached to our reply in App Store Connect. It starts from app launch and shows recording a win (with the win animation), recording a loss, the calendar, the analysis screen (including a locked period that opens the subscription screen), the slot counter, Settings and the subscription purchase screen.
+We are a solo developer and do not own a physical iOS device, so the recording was made on the iOS Simulator (newest iPhone model, latest iOS available in Xcode) with the same build configuration. The red circles in the video mark each tap. On launch the app shows the system App Tracking Transparency prompt (used only for AdMob ads); in the video it is answered with "Ask App Not to Track". The app has no account and uses no device-specific features such as the camera or location, so the behavior is the same on a physical device. Ads are shown by Google AdMob and may or may not load in the simulator; no feature depends on them. The simulator uses the U.S. storefront, so prices in the video may be shown in USD.
+
+2. Purpose and audience
+Kachimake is a personal record-keeping app (a ledger) for adults in Japan who play pachinko, pachislot, or bet on horse racing, keirin, boat racing or auto racing. The user enters how much they spent and how much they got back, and the app shows the monthly result, the payback rate, win/loss counts and hourly result on a calendar and in charts. It also includes a tap counter for counting small wins on a slot machine and an optional monthly loss limit that warns the user before they go over it.
+The app does not offer any gambling, betting, wagering or real-money gaming. It cannot place bets, does not link to betting services and has no prizes or coins. It only stores numbers the user types in. The app explains in its description that pachinko/pachislot is prohibited under 18 and public race betting under 20 in Japan; the app is intended for adults.
+
+3. How to use (no login or account is needed)
+- Launch the app. The first tab (カレンダー) shows the month's result and a calendar.
+- Tap the "+" button to record a session: choose the type (pachinko, pachislot, horse racing, keirin, boat racing, auto racing, other), enter the amount spent (投資) and returned (回収), and optionally the hall/venue, machine/race, time played, tags and a memo. Tap 記入する (save).
+- 分析 (Analysis): cumulative chart, payback rate, win rate, hourly result and per-type results. This month and last month are free.
+- カウンター (Counter): tap the large buttons to count; the observed probability (1/x) is shown.
+- 設定 (Settings): monthly loss limit, evening reminder notification, font size, backup export/import, subscription and restore purchase.
+All records are stored only on the device. The app works offline (except ads and purchases).
+
+4. External services
+- Apple In-App Purchase, managed through RevenueCat (purchase validation and restore). RevenueCat receives only an anonymous app user ID and the App Store transaction. The app never receives the user's name, email or card number.
+- Google AdMob (banner ads on the Analysis and Settings screens for free users, and an optional rewarded ad). AdMob may receive the device's advertising identifier, IP address, approximate region and device type. Personalized ads are used only if the user allows tracking in the App Tracking Transparency prompt; ads are shown either way. In regions that require it (e.g. EU), Google's consent form is shown, and it can be changed later from Settings. The user's records (amounts, hall names, machine names, memos) are never sent to AdMob or used for ads. Ads are never shown on the entry screen or the counter, and are removed entirely for subscribers.
+- No other servers, no login service and no analytics tools. Records stay on the device. Share images are created on the device and sent only to the app the user picks in the share sheet.
+
+5. Regional differences
+The app is made for users in Japan and its content is in Japanese. Features are the same in every region. The only regional difference is the Google consent form for ads, which Google shows only in regions where it is legally required (such as the EU).
+
+6. Third-party material
+The app contains no third-party content that requires a license. All text, the icon and images are our own. The slot counter's built-in example machine uses fictional practice values (labeled "練習用(架空の数値)"), not data from any real machine. The app is not affiliated with any pachinko maker, hall or race organizer. Open-source libraries (Capacitor, React, RevenueCat SDK, Google Mobile Ads SDK) are used under their respective licenses.
+
+7. In-App Purchase
+Auto-renewable subscription "有料プラン" (Premium) with two plans: monthly JPY 400 and annual JPY 3,000, each with a 7-day free trial for new subscribers. It unlocks: analysis for 3 months / this year / all time, results by hall, machine, weekday, bet type and tag, the settings estimate in the counter, unlimited machine registration in the counter (free: 1), CSV export, and no ads.
+Recording, the calendar, this month's and last month's analysis, the loss limit, share images and backup are free forever. A free user can also watch one rewarded ad to use the premium analysis features (except CSV) for 24 hours, up to twice a day.
+How to reach it: Settings > 有料プラン > 内容と料金を見る; or on the Analysis tab tap a locked period (3か月 / 今年 / 全期間) or "有料プランの内容を見る"; or in the Counter tap "有料プランの内容を見る" under 設定の推測. The screen also opens once after the user's third record. It shows the free/premium comparison table, the plans with prices and trial, the purchase button, "購入を復元" (restore), the auto-renewal terms and links to the Terms of Use and Privacy Policy. Subscriptions can be cancelled in the App Store subscription settings.

@@ -1,0 +1,102 @@
+# App Review(Guideline 2.1 Information Needed)に出す画面録画を、GitHub のクラウド Mac の iPhone シミュレーター(最新 iOS)で撮る。
+# 持ち主は iPhone を持っていないので実機では撮れない。録画用ビルド(VITE_REVIEW_TOUR=1)は起動すると src/dev/reviewTour.ts が
+# 「勝ちを記入(演出)→ 負けを記入 → カレンダー → 分析 → 小役カウンター → 設定 → 有料プランの購入画面」を自動で操作する。製品版には入らない。
+# 広告(AdMob)は起動時に iOS のトラッキング許可のダイアログを出す。JS からは押せないので、idb で「Ask App Not to Track」を押す(失敗しても録画は続ける)。
+name: iOS review video
+
+on:
+  workflow_dispatch:
+
+jobs:
+  record:
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Build web assets (review tour) and sync iOS
+        run: |
+          npm ci --no-audit --no-fund
+          VITE_REVIEW_TOUR=1 npm run build
+          npx cap sync ios
+          node scripts/sync-ios-ads.mjs
+
+      - name: Build for the simulator
+        run: |
+          xcodebuild build \
+            -project ios/App/App.xcodeproj \
+            -scheme App -configuration Debug \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/dd" CODE_SIGNING_ALLOWED=NO -quiet
+
+      # トラッキング許可のダイアログを押すための道具(入らなくても録画は撮る)
+      - name: Install idb (best effort)
+        continue-on-error: true
+        run: |
+          brew tap facebook/fb
+          brew install facebook/fb/idb-companion
+          pip install fb-idb
+          idb --help > /dev/null && echo "idb ok"
+
+      - name: Record on the newest iPhone simulator
+        run: |
+          set -x
+          UDID=$(xcrun simctl list devices available -j | python3 -c '
+          import json,sys,re
+          d=json.load(sys.stdin)["devices"]
+          rts=sorted([k for k in d if "iOS" in k], key=lambda k:[int(x) for x in re.findall(r"\d+",k.split("iOS")[-1])])
+          devs=[x for x in d[rts[-1]] if x["name"].startswith("iPhone")]
+          pro=[x for x in devs if "Pro" in x["name"] and "Max" not in x["name"]]
+          print((pro or devs)[-1]["udid"])')
+          xcrun simctl list devices | grep "$UDID"
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl status_bar "$UDID" override --time 9:41 --batteryState charged --batteryLevel 100 --cellularBars 4 --wifiBars 3 || true
+          APP=$(ls -d "$RUNNER_TEMP"/dd/Build/Products/Debug-iphonesimulator/*.app | head -1)
+          BID=$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$APP/Info.plist")
+          xcrun simctl install "$UDID" "$APP"
+          if command -v idb > /dev/null; then (idb_companion --udid "$UDID" > "$RUNNER_TEMP/idb.log" 2>&1 &); sleep 5; idb connect localhost 10882 || true; fi
+          sleep 5
+          xcrun simctl io "$UDID" recordVideo --codec=h264 --force "$RUNNER_TEMP/review-kachimake.mp4" &
+          REC=$!
+          sleep 3
+          xcrun simctl launch "$UDID" "$BID"
+          # トラッキング許可のダイアログが出たら「Ask App Not to Track」を押す(最大40秒待つ)
+          if command -v idb > /dev/null; then
+            for i in $(seq 1 40); do
+              XY=$(idb ui describe-all --udid "$UDID" 2>/dev/null | python3 -c '
+          import json,sys
+          try: items=json.load(sys.stdin)
+          except Exception: sys.exit()
+          for it in items:
+              if it.get("AXLabel") in ("Ask App Not to Track","Appに追跡しないように要求"):
+                  f=it["frame"]; print(int(f["x"]+f["width"]/2), int(f["y"]+f["height"]/2)); break') || true
+              if [ -n "$XY" ]; then sleep 2; idb ui tap --udid "$UDID" $XY && echo "tapped ATT at $XY"; break; fi
+              sleep 1
+            done
+          fi
+          sleep 125
+          kill -INT $REC
+          wait $REC || true
+          xcrun simctl io "$UDID" screenshot "$RUNNER_TEMP/last-kachimake.png"
+          sw_vers; xcrun simctl list runtimes | tail -3
+          ls -la "$RUNNER_TEMP"/review-*.mp4
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: review-video-kachimake
+          path: |
+            ${{ runner.temp }}/review-kachimake.mp4
+            ${{ runner.temp }}/last-kachimake.png
