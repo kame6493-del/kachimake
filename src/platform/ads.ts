@@ -30,10 +30,16 @@ export function initAds(): Promise<AdsState> {
       if (!info.canRequestAds && info.isConsentFormAvailable && info.status === AdmobConsentStatus.REQUIRED) {
         info = await AdMob.showConsentForm();
       }
-      // iOS の追跡の許可は、同意の確認の後に1回だけ聞く(断られても広告は出る。個人に合わせないだけ)
+      // iOS の追跡の許可は、同意の確認の後に聞く(断られても広告は出る。個人に合わせないだけ)
+      // 起動の直後(アプリが前面になる前)に聞くと、iOS は画面を出さずに黙って捨てる。
+      // 2026-10-07 の審査で「許可の画面が見つからない」と却下されたので、少し待ってから聞き、まだ決まっていなければもう1回聞く
       if (Capacitor.getPlatform() === 'ios') {
-        const t = await AdMob.trackingAuthorizationStatus().catch(() => null);
-        if (t?.status === 'notDetermined') await AdMob.requestTrackingAuthorization().catch(() => {});
+        for (const wait of [1000, 2500]) {
+          await sleep(wait);
+          const t = await AdMob.trackingAuthorizationStatus().catch(() => null);
+          if (t?.status !== 'notDetermined') break;
+          await AdMob.requestTrackingAuthorization().catch(() => {});
+        }
       }
       const state = { allowed: info.canRequestAds, privacyOptions: String(info.privacyOptionsRequirementStatus) === 'REQUIRED' };
       if (state.allowed) void preloadReward();
