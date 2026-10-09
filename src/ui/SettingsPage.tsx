@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Capacitor } from '@capacitor/core';
 import type { AppData, Settings } from '../domain/types';
 import { normalize, toCsv, today } from '../domain/data';
 import { exportText, pickTextFile } from '../platform/files';
@@ -164,7 +165,7 @@ export function SettingsPage({ data, premium, setSettings, replaceData, onPaywal
           </p>
         )}
         <p className="note">
-          記入はこの端末の中に保存されます。端末のバックアップ(Android は Google、iPhone は iCloud)を有効にしていれば、機種変更のときに一緒に移ります。
+          記入はこの端末の中に保存されます。端末のバックアップ({Capacitor.getPlatform() === 'ios' ? 'iCloud' : 'Google'})を有効にしていれば、機種変更のときに一緒に移ります。
           念のため、ファイルにも書き出しておけます{lastBackup ? `(前回 ${new Date(lastBackup).toLocaleDateString('ja-JP')})` : ''}。
         </p>
         <ul className="menu">

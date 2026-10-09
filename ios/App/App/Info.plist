@@ -228,8 +228,6 @@
 			<string>3qcr597p9d.skadnetwork</string>
 		</dict>
 	</array>
-	<key>NSUserTrackingUsageDescription</key>
-	<string>許可すると、広告があなたに合ったものになります。許可しなくても広告は出ますが、記入の内容が広告に使われることはありません。</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>LSRequiresIPhoneOS</key>
