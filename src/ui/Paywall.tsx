@@ -20,7 +20,7 @@ const TABLE: [string, boolean | string, boolean | string][] = [
   ['今月・先月の分析', true, true],
   ['負けの上限・シェア画像', true, true],
   ['3か月・今年・全期間の分析', false, true],
-  ['店舗・機種・曜日・券種・印ごとの収支', false, true],
+  ['店舗・機種・曜日・券種・タグごとの収支', false, true],
   ['小役カウンター', '1台まで', '制限なし'],
   ['設定の推測', false, true],
   ['CSVの書き出し', false, true],

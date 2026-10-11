@@ -11,7 +11,7 @@ if (import.meta.env.DEV) {
   if (card) {
     const { drawCard } = await import('./platform/shareImage');
     const c = drawCard(card === 'win'
-      ? { head: '9月24日(木) パチスロ', amount: 46600, badge: '大勝!', lines: ['ジャグラー / 駅前ホール', '投資 ¥12,000 → 回収 ¥58,600'] }
+      ? { head: '9月24日(木) パチスロ', amount: 46600, badge: '大勝!', lines: ['Aタイプ 7の台 / 駅前ホール', '投資 ¥12,000 → 回収 ¥58,600'] }
       : card === 'lose'
         ? { head: '2026年8月の収支', amount: -38200, badge: '修行中', lines: ['7勝11敗・回収率 81%', '18回の記入'] }
         : { head: '2026年9月の収支', amount: 51600, badge: '勝ち組', lines: ['6勝6敗・回収率 139%', 'いま5連勝中'] });

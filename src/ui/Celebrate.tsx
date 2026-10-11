@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { signedYen } from './format';
+import { signedEn as signedYen } from './format';
 
 export type Hype = 'jackpot' | 'big' | 'win';
 

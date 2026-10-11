@@ -119,10 +119,10 @@ export async function runReviewTour() {
   await sleep(9000);
 
   // 1件目: パチンコで勝ち(投資 ¥10,000 → 回収 ¥25,000)。「大勝!」の演出が出る
-  await writeEntry('パチンコ', [10000], [10000, 10000, 5000], '駅前店', '海物語');
+  await writeEntry('パチンコ', [10000], [10000, 10000, 5000], '駅前店', '甘デジ');
   await sleep(2500);
   // 2件目: 競馬で負け(購入 ¥6,000 → 払戻 ¥0)
-  await writeEntry('競馬', [5000, 1000], [], '東京競馬場', '11R');
+  await writeEntry('競馬', [5000, 1000], [], 'ネット投票', '11R');
   await sleep(1500);
   await closePaywallIfOpen();
 

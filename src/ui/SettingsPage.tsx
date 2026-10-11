@@ -1,15 +1,17 @@
+// 設定(見本 04)。中身は 1.1.0 と同じ(有料プラン・上限とお知らせ・表示・データ・貯玉・規約)。上限とお知らせは別の画面へ
 import { useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import type { AppData, Settings } from '../domain/types';
 import { normalize, toCsv, today } from '../domain/data';
 import { exportText, pickTextFile } from '../platform/files';
 import { manageUrl } from '../platform/billing';
-import { yen } from './format';
+import { en } from './format';
 import { ballsToYen, stock } from '../domain/stats';
 import { shouldNudgeBackup } from '../domain/nudge';
-import { allowNotifications } from '../platform/native';
+import { BrandHead, Icon } from './parts';
 
 export const LAST_BACKUP_KEY = 'kachimake.lastBackup';
+export const APP_VERSION = '1.2.0';
 const readLast = () => { try { return Number(localStorage.getItem(LAST_BACKUP_KEY)) || 0; } catch { return 0; } };
 const FONT_SIZES: [Settings['fontScale'], string][] = [[1, '標準'], [1.15, '大きい'], [1.3, 'とても大きい']];
 
@@ -21,26 +23,32 @@ interface Props {
   onPaywall: (why: string) => void;
   onRestore: () => Promise<void>;
   toast: (msg: string) => void;
+  onLimit: () => void;
+  onCounter: () => void;
   /** 広告の同意を変える画面(EU などで必要なときだけ) */
   onPrivacyOptions?: () => void;
 }
 
-export function SettingsPage({ data, premium, setSettings, replaceData, onPaywall, onRestore, toast, onPrivacyOptions }: Props) {
+function Row({ icon, title, sub, right, onClick, href }: { icon: string; title: string; sub?: string; right?: React.ReactNode; onClick?: () => void; href?: string }) {
+  const body = (
+    <>
+      <span className="srow-ic"><Icon name={icon} size={26} /></span>
+      <span className="srow-text"><b>{title}</b>{sub && <small>{sub}</small>}</span>
+      {right}
+      <Icon name="right" size={18} className="chev" />
+    </>
+  );
+  return href
+    ? <a className="srow" href={href} target="_blank" rel="noreferrer">{body}</a>
+    : <button className="srow" onClick={onClick}>{body}</button>;
+}
+
+export function SettingsPage({ data, premium, setSettings, replaceData, onPaywall, onRestore, toast, onLimit, onCounter, onPrivacyOptions }: Props) {
   const s = data.settings;
-  const [limit, setLimit] = useState(s.monthlyLimit ? String(s.monthlyLimit) : '');
   const [pending, setPending] = useState<{ data: AppData; dropped: number } | null>(null);
   const [lastBackup, setLastBackup] = useState(readLast);
   const stocks = stock(data.sessions).filter((r) => r.count !== 0);
   const nudge = shouldNudgeBackup(data.sessions.length, lastBackup, Date.now());
-
-  const toggleRemind = async () => {
-    if (s.remind.on) return setSettings({ ...s, remind: { ...s.remind, on: false } });
-    if (!(await allowNotifications())) return toast('お知らせが許可されていません。端末の設定から許可してください');
-    setSettings({ ...s, remind: { ...s.remind, on: true } });
-    toast(`毎日 ${s.remind.time} にお知らせします(記入した日は出ません)`);
-  };
-
-  const saveLimit = () => setSettings({ ...s, monthlyLimit: Number(limit) || 0 });
 
   const backup = async () => {
     await exportText(`kachimake-backup-${today()}.json`, JSON.stringify(data), 'application/json');
@@ -63,116 +71,43 @@ export function SettingsPage({ data, premium, setSettings, replaceData, onPaywal
   };
 
   return (
-    <div className="settings">
-      <h1 className="mincho page-title">設定</h1>
+    <div className="page settings">
+      <BrandHead sub="遊びを、記録で味方に。" right={<span className="head-title">設定</span>} />
 
-      <section className="block">
-        <h2 className="mincho sec">有料プラン</h2>
+      <section className="card privacy-card">
+        <img src="./img/shield.png" alt="" width={86} height={84} />
+        <div>
+          <b>あなたの記録は、この端末にだけ</b>
+          <p>カチマケの記録はサーバーに送られず、この端末の中にだけ保存されます。端末のバックアップ({Capacitor.getPlatform() === 'ios' ? 'iCloud' : 'Google'})を有効にしていれば、機種変更でも一緒に移ります。</p>
+        </div>
+      </section>
+
+      <section className="card sgroup">
+        <h2><Icon name="trophy" />有料プラン</h2>
         {premium ? (
           <>
-            <p>有料プランが有効です。</p>
-            <a className="link-btn" href={manageUrl} target="_blank" rel="noreferrer">ストアで解約・変更する</a>
+            <div className="srow static"><span className="srow-ic"><Icon name="check" size={26} /></span><span className="srow-text"><b>有料プランが有効です</b><small>すべての分析・CSV・設定の推測が使えます</small></span></div>
+            <Row icon="gear" title="ストアで解約・変更する" href={manageUrl} />
           </>
         ) : (
           <>
-            <p>長い期間の分析、店舗・機種ごとの収支、設定の推測が使えて、広告が消えます。</p>
-            <div className="inline">
-              <button className="btn-line" onClick={() => onPaywall('有料プラン')}>内容と料金を見る</button>
-              <button className="link-btn" onClick={() => onRestore()}>購入を復元</button>
-            </div>
+            <Row icon="chart" title="内容を見る" sub="長い期間の分析、店舗・機種ごとの収支、設定の推測。広告が消えます" onClick={() => onPaywall('有料プラン')} />
+            <Row icon="undo" title="購入を復元" sub="機種変更・入れ直しのあとに" onClick={() => void onRestore()} />
           </>
         )}
       </section>
 
-      <section className="block">
-        <h2 className="mincho sec"><label htmlFor="limit">月の負けの上限</label></h2>
-        <p className="note">その月の負けがこの額に近づくと、記録の画面でお知らせします。0 にすると止まります。</p>
-        <div className="inline nowrap">
-          <span className="yen-input">
-            <span>¥</span>
-            <input id="limit" inputMode="numeric" value={limit ? Number(limit).toLocaleString('ja-JP') : ''} placeholder="0"
-              onChange={(e) => setLimit(e.target.value.replace(/[^\d]/g, '').slice(0, 8))} onBlur={saveLimit} />
-          </span>
-          <button className="btn" onClick={saveLimit}>上限を保存</button>
-        </div>
-        {s.monthlyLimit > 0 && <p className="note">いまの上限 {yen(s.monthlyLimit)}</p>}
-      </section>
-
-      <section className="block">
-        <h2 className="mincho sec">記入のお知らせ</h2>
-        <p className="note">記入を忘れた日の夜にだけ、お知らせを出します。その日に記入していれば出ません。</p>
-        <div className="inline nowrap">
-          <button className={`switch ${s.remind.on ? 'on' : ''}`} role="switch" aria-checked={s.remind.on} onClick={toggleRemind}>
-            <span className="switch-knob" aria-hidden="true" />{s.remind.on ? 'お知らせする' : 'お知らせしない'}
-          </button>
-          <input type="time" className="time-input" aria-label="お知らせの時刻" value={s.remind.time}
-            onChange={(e) => /^\d{2}:\d{2}$/.test(e.target.value) && setSettings({ ...s, remind: { ...s.remind, time: e.target.value } })} />
-        </div>
-      </section>
-
-      {stocks.length > 0 && (
-        <section className="block">
-          <h2 className="mincho sec">貯玉・貯メダル</h2>
-          <table className="ledger stock">
-            <thead><tr><th scope="col">店舗</th><th scope="col">残り</th><th scope="col">円にすると</th></tr></thead>
-            <tbody>
-              {stocks.map((r) => (
-                <tr key={`${r.kind}${r.place}`}>
-                  <th scope="row" className="ellipsis"><span className="mark" aria-hidden="true">{r.kind === 'slot' ? 'スロ' : 'パチ'}</span>{r.place}</th>
-                  <td className={r.count < 0 ? 'minus' : ''}>{r.count.toLocaleString('ja-JP')}{r.kind === 'slot' ? '枚' : '玉'}</td>
-                  <td>{r.rate ? yen(ballsToYen(r.count, r.rate)) : '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <p className="note">記入の「貯玉を使った・貯めた」から数えています。店の残高と違うときは、記入を直してください。</p>
-        </section>
-      )}
-
-      <section className="block">
-        <h2 className="mincho sec">表示</h2>
-        <div className="field">
-          <span className="field-label">文字の大きさ</span>
-          <div className="opts">
-            {FONT_SIZES.map(([v, l]) => (
-              <button key={v} aria-pressed={s.fontScale === v} className={`opt ${s.fontScale === v ? 'on' : ''}`} onClick={() => setSettings({ ...s, fontScale: v })}>{l}</button>
-            ))}
-          </div>
-        </div>
-        <div className="field">
-          <span className="field-label">週の始まり</span>
-          <div className="opts">
-            {(['日曜', '月曜'] as const).map((l, i) => (
-              <button key={l} aria-pressed={s.weekStart === i} className={`opt ${s.weekStart === i ? 'on' : ''}`} onClick={() => setSettings({ ...s, weekStart: i as 0 | 1 })}>{l}</button>
-            ))}
-          </div>
-        </div>
-        <div className="field">
-          <span className="field-label">黒字(勝ち)の色</span>
-          <div className="opts">
-            <button aria-pressed={s.winColor === 'ink'} className={`opt ${s.winColor === 'ink' ? 'on' : ''}`} onClick={() => setSettings({ ...s, winColor: 'ink' })}>青(いつもの色)</button>
-            <button aria-pressed={s.winColor === 'blue'} className={`opt ${s.winColor === 'blue' ? 'on' : ''}`} onClick={() => setSettings({ ...s, winColor: 'blue' })}>黒(帳簿と同じ)</button>
-          </div>
-        </div>
-      </section>
-
-      <section className="block">
-        <h2 className="mincho sec">データ</h2>
+      <section className="card sgroup">
+        <h2><Icon name="database" />データ管理</h2>
         {nudge && (
           <p className="backup-nudge">
             {lastBackup ? `最後のバックアップから${Math.floor((Date.now() - lastBackup) / 86400000)}日たちました。` : 'まだ一度もバックアップしていません。'}
-            {data.sessions.length}回ぶんの記入を守るため、書き出しておきましょう。
+            {data.sessions.length}回ぶんの記録を守るため、書き出しておきましょう。
           </p>
         )}
-        <p className="note">
-          記入はこの端末の中に保存されます。端末のバックアップ({Capacitor.getPlatform() === 'ios' ? 'iCloud' : 'Google'})を有効にしていれば、機種変更のときに一緒に移ります。
-          念のため、ファイルにも書き出しておけます{lastBackup ? `(前回 ${new Date(lastBackup).toLocaleDateString('ja-JP')})` : ''}。
-        </p>
-        <ul className="menu">
-          <li><button onClick={backup}>バックアップを書き出す</button></li>
-          <li><button onClick={load}>バックアップから戻す</button></li>
-          <li><button onClick={csv}>CSVで書き出す{!premium && <small className="paid">有料</small>}</button></li>
-        </ul>
+        <Row icon="fileDown" title="CSV書き出し" sub="収支の記録を表計算ソフト用に書き出します" right={!premium ? <small className="paid">有料</small> : undefined} onClick={csv} />
+        <Row icon="backup" title="バックアップを書き出す" sub={lastBackup ? `前回 ${new Date(lastBackup).toLocaleDateString('ja-JP')}` : '記録をファイルに控えておきます'} onClick={backup} />
+        <Row icon="fileUp" title="バックアップから戻す" sub="書き出したファイルから記録を戻します" onClick={load} />
         {pending && (
           <div className="confirm">
             <p>
@@ -187,15 +122,82 @@ export function SettingsPage({ data, premium, setSettings, replaceData, onPaywal
         )}
       </section>
 
-
-      <section className="block">
-        <ul className="links">
-          <li><a href="./terms.html" target="_blank" rel="noreferrer">利用規約</a></li>
-          <li><a href="./privacy.html" target="_blank" rel="noreferrer">プライバシーポリシー</a></li>
-          {onPrivacyOptions && <li><button className="link-btn" onClick={onPrivacyOptions}>広告の同意を変える</button></li>}
-        </ul>
-        <p className="note">カチマケ 1.1.0 ・ パチンコ・パチスロは18歳未満、公営競技の投票は20歳未満の方は法律で禁止されています。</p>
+      <section className="card sgroup">
+        <h2><Icon name="bell" />上限・お知らせ</h2>
+        <Row icon="target" title="上限設定・通知" sub="月の負けの上限と、記録のお知らせ"
+          right={<span className="srow-val">{s.monthlyLimit > 0 ? en(s.monthlyLimit) : 'オフ'}</span>} onClick={onLimit} />
       </section>
+
+      <section className="card sgroup">
+        <h2><Icon name="monitor" />表示・外観</h2>
+        <div className="sset">
+          <span className="srow-ic"><Icon name="text" size={26} /></span>
+          <div className="sset-body">
+            <b>文字の大きさ</b>
+            <div className="seg">
+              {FONT_SIZES.map(([v, l]) => (
+                <button key={v} aria-pressed={s.fontScale === v} className={s.fontScale === v ? 'on' : ''} onClick={() => setSettings({ ...s, fontScale: v })}>{l}</button>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="sset">
+          <span className="srow-ic"><Icon name="calendar" size={26} /></span>
+          <div className="sset-body">
+            <b>週の始まり</b>
+            <div className="seg">
+              {(['日曜', '月曜'] as const).map((l, i) => (
+                <button key={l} aria-pressed={s.weekStart === i} className={s.weekStart === i ? 'on' : ''} onClick={() => setSettings({ ...s, weekStart: i as 0 | 1 })}>{l}</button>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="sset">
+          <span className="srow-ic"><Icon name="palette" size={26} /></span>
+          <div className="sset-body">
+            <b>勝ちの色</b>
+            <small>赤と緑の区別がしにくいときは青にできます</small>
+            <div className="seg">
+              <button aria-pressed={s.winColor === 'ink'} className={s.winColor === 'ink' ? 'on' : ''} onClick={() => setSettings({ ...s, winColor: 'ink' })}>緑(いつもの色)</button>
+              <button aria-pressed={s.winColor === 'blue'} className={s.winColor === 'blue' ? 'on' : ''} onClick={() => setSettings({ ...s, winColor: 'blue' })}>青</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {stocks.length > 0 && (
+        <section className="card sgroup">
+          <h2><Icon name="coins" />貯玉・貯メダル</h2>
+          <table className="ledger stock">
+            <thead><tr><th scope="col">店舗</th><th scope="col">残り</th><th scope="col">円にすると</th></tr></thead>
+            <tbody>
+              {stocks.map((r) => (
+                <tr key={`${r.kind}${r.place}`}>
+                  <th scope="row" className="ellipsis">{r.place}<small className="muted">{r.kind === 'slot' ? ' スロ' : ' パチ'}</small></th>
+                  <td className={r.count < 0 ? 'minus' : ''}>{r.count.toLocaleString('ja-JP')}{r.kind === 'slot' ? '枚' : '玉'}</td>
+                  <td>{r.rate ? en(ballsToYen(r.count, r.rate)) : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="note">記録の「貯玉を使った・貯めた」から数えています。店の残高と違うときは、記録を直してください。</p>
+        </section>
+      )}
+
+      <section className="card sgroup">
+        <h2><Icon name="counter" />ツール</h2>
+        <Row icon="counter" title="小役カウンター" sub="小役を数えて、設定ごとの確率を出します" onClick={onCounter} />
+      </section>
+
+      <section className="card sgroup">
+        <h2><Icon name="help" />サポート・その他</h2>
+        <Row icon="doc" title="使い方・お問い合わせ" sub="基本の使い方と、ご意見・ご要望の送り先" href="./support.html" />
+        <Row icon="shieldDoc" title="利用規約" href="./terms.html" />
+        <Row icon="lock" title="プライバシーポリシー" href="./privacy.html" />
+        {onPrivacyOptions && <Row icon="info" title="広告の同意を変える" onClick={onPrivacyOptions} />}
+        <div className="srow static"><span className="srow-ic"><Icon name="info" size={26} /></span><span className="srow-text"><b>アプリについて</b><small>カチマケ {APP_VERSION}</small></span></div>
+      </section>
+      <p className="note center legal-age">パチンコ・パチスロは18歳未満、公営競技の投票は20歳未満の方は法律で禁止されています。</p>
     </div>
   );
 }

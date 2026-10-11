@@ -4,7 +4,8 @@ import { KINDS, kindInfo } from '../domain/types';
 import { byKind, cumulative, groupBy, inRange, monthly, summarize, type GroupKey } from '../domain/stats';
 import { addMonths, monthRange, today } from '../domain/data';
 import { CumulativeChart, MonthlyBars } from './Charts';
-import { hours, pct, signedYen, tone, yen } from './format';
+import { hours, pct, signedEn as signedYen, tone, en as yen } from './format';
+import { BrandHead, KindIcon, KIND_COLOR, kindShort } from './parts';
 
 type Period = 'thisMonth' | 'lastMonth' | 'last3' | 'thisYear' | 'all';
 const PERIODS: { id: Period; label: string; free: boolean }[] = [
@@ -19,7 +20,7 @@ const GROUPS: { id: GroupKey; label: string; head: string }[] = [
   { id: 'target', label: '機種・レース', head: '機種・レース' },
   { id: 'weekday', label: '曜日', head: '曜日' },
   { id: 'betType', label: '券種', head: '券種' },
-  { id: 'tag', label: '印', head: '印' },
+  { id: 'tag', label: 'タグ', head: 'タグ' },
 ];
 
 function range(p: Period): { from: string; to: string } {
@@ -54,7 +55,7 @@ export function Analysis({ data, premium, unlockedUntil, onPaywall }: {
 
   return (
     <div className="analysis">
-      <h1 className="mincho page-title">分析</h1>
+      <BrandHead sub="数字で、自分の遊び方を知る。" right={<span className="head-title">分析</span>} />
       {unlockedUntil && <p className="note unlocked">広告を見たので、{unlockedUntil}まで有料の分析が使えます</p>}
 
       <div className="tabs" role="tablist" aria-label="期間">
@@ -65,19 +66,19 @@ export function Analysis({ data, premium, unlockedUntil, onPaywall }: {
         ))}
       </div>
 
-      <div className="closing">
+      <div className="card closing">
         <div className="closing-label">{label}の収支</div>
         <div className={`closing-amount ${tone(sum.profit)}`}>{signedYen(sum.profit)}</div>
         <div className="closing-meta">{sum.count === 0 ? <span>この期間の記入はありません</span> : <span>{sum.count}回の記入</span>}</div>
       </div>
 
       <div className="analysis-grid">
-        <section className="block chart-block" aria-label="累計の推移">
+        <section className="card chart-block" aria-label="累計の推移">
           <h2 className="mincho sec">累計の推移</h2>
           <CumulativeChart points={cum} />
         </section>
 
-        <section className="block" aria-label="指標">
+        <section className="card" aria-label="指標">
           <h2 className="mincho sec">指標</h2>
           <dl className="metrics">
             <div><dt>回収率</dt><dd>{pct(sum.recovery)}</dd></div>
@@ -90,7 +91,7 @@ export function Analysis({ data, premium, unlockedUntil, onPaywall }: {
           </dl>
         </section>
 
-        <section className="block" aria-label="種類別">
+        <section className="card" aria-label="種類別">
           <h2 className="mincho sec">種類別</h2>
           {kinds.size === 0 ? <p className="empty-line">この期間の記入はありません</p> : (
             <table className="ledger">
@@ -100,7 +101,7 @@ export function Analysis({ data, premium, unlockedUntil, onPaywall }: {
                   const s = kinds.get(k.id)!;
                   return (
                     <tr key={k.id}>
-                      <th scope="row"><span className="mark" aria-hidden="true">{k.short}</span>{k.label}</th>
+                      <th scope="row"><span className="kind-cell"><KindIcon kind={k.id} size={22} />{kindShort(k.id)}</span></th>
                       <td>{s.count}</td><td>{pct(s.recovery, 0)}</td>
                       <td className={`amount ${tone(s.profit)}`}>{signedYen(s.profit)}</td>
                     </tr>
@@ -111,7 +112,7 @@ export function Analysis({ data, premium, unlockedUntil, onPaywall }: {
           )}
         </section>
 
-        <section className="block" aria-label="どこで勝ち、どこで負けているか">
+        <section className="card" aria-label="どこで勝ち、どこで負けているか">
           <div className="sec-row">
             <h2 className="mincho sec">どこで勝ち、どこで負けているか</h2>
           </div>
@@ -128,7 +129,7 @@ export function Analysis({ data, premium, unlockedUntil, onPaywall }: {
                   {groups.map((r) => (
                     <tr key={r.key}>
                       <th scope="row" className="ellipsis">
-                        {r.kind && <span className="mark" title={kindInfo(r.kind).label}>{kindInfo(r.kind).short}</span>}{r.label}
+                        {r.kind && <i className="kind-bar" style={{ background: KIND_COLOR[r.kind] }} title={kindInfo(r.kind).label} />}{r.label}
                       </th><td>{r.summary.count}</td><td>{pct(r.summary.recovery, 0)}</td>
                       <td className={`amount ${tone(r.summary.profit)}`}>{signedYen(r.summary.profit)}</td>
                     </tr>
@@ -145,7 +146,7 @@ export function Analysis({ data, premium, unlockedUntil, onPaywall }: {
         </section>
 
         {period !== 'thisMonth' && period !== 'lastMonth' && (
-          <section className="block chart-block" aria-label="月ごとの収支">
+          <section className="card chart-block" aria-label="月ごとの収支">
             <h2 className="mincho sec">月ごとの収支</h2>
             <MonthlyBars rows={months} />
           </section>

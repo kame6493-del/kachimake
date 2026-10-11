@@ -8,6 +8,11 @@ import { adsMock, initAds, removeBanner, setBanner, showPrivacyOptions, showRewa
 import { dailyLeft, extendUnlock, parseDaily, spendDaily } from './domain/unlock';
 import { Capacitor } from '@capacitor/core';
 import { Home } from './ui/Home';
+import { History } from './ui/History';
+import { CalendarPage } from './ui/CalendarPage';
+import { Detail } from './ui/Detail';
+import { LimitPage } from './ui/LimitPage';
+import { BackHead, Icon } from './ui/parts';
 import { Analysis } from './ui/Analysis';
 import { Counter } from './ui/Counter';
 import { SettingsPage } from './ui/SettingsPage';
@@ -21,14 +26,19 @@ import { askReview, keepAwake, scheduleReminders } from './platform/native';
 import { shareCard, type ShareCard } from './platform/shareImage';
 import { dateJa, pct } from './ui/format';
 import { kindInfo } from './domain/types';
+import { newestFirst } from './domain/views';
 
-type Tab = 'home' | 'analysis' | 'counter' | 'settings';
+type Tab = 'home' | 'history' | 'calendar' | 'analysis' | 'settings';
 const TABS: { id: Tab; label: string; icon: string }[] = [
-  { id: 'home', label: 'カレンダー', icon: 'M4 6h16v14H4zM4 10h16M8 3v4M16 3v4' },
-  { id: 'analysis', label: '分析', icon: 'M5 20V11M11 20V5M17 20v-7M3 20h18' },
-  { id: 'counter', label: 'カウンター', icon: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 8v8M8 12h8' },
-  { id: 'settings', label: '設定', icon: 'M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1' },
+  { id: 'home', label: 'ホーム', icon: 'home' },
+  { id: 'history', label: '履歴', icon: 'list' },
+  { id: 'calendar', label: 'カレンダー', icon: 'calendar' },
+  { id: 'analysis', label: '分析', icon: 'chart' },
+  { id: 'settings', label: '設定', icon: 'gear' },
 ];
+const isTab = (t: string | null): t is Tab => TABS.some((x) => x.id === t);
+/** タブの上に重なる画面 */
+type Layer = { kind: 'detail'; id: string } | { kind: 'limit' } | { kind: 'counter' } | null;
 
 const UNLOCK_KEY = 'kachimake.unlockUntil';
 const DAILY_KEY = 'kachimake.rewardDaily';
@@ -58,13 +68,18 @@ export default function App() {
   const [billing, setBilling] = useState<BillingState>({ status: 'unavailable', reason: '読み込み中' });
   const [tab, setTab] = useState<Tab>(() => {
     const t = import.meta.env.DEV ? new URLSearchParams(location.search).get('tab') : null;
-    return t === 'analysis' || t === 'counter' || t === 'settings' ? t : 'home';
+    return isTab(t) ? t : 'home';
+  });
+  const [layer, setLayer] = useState<Layer>(() => {
+    // 開発時だけ: ?view=limit / counter / detail で画面写真を撮る
+    const v = import.meta.env.DEV ? new URLSearchParams(location.search).get('view') : null;
+    return v === 'limit' || v === 'counter' ? { kind: v } : v === 'detail' ? { kind: 'detail', id: '' } : null;
   });
   const [month, setMonth] = useState(today().slice(0, 7));
   const [selected, setSelected] = useState(today());
   // 開発時だけ: ?sheet=form / paywall / intro で画面写真を撮る
   const devSheet = import.meta.env.DEV ? new URLSearchParams(location.search).get('sheet') : null;
-  const [form, setForm] = useState<{ session: Session | null; date: string } | null>(devSheet === 'form' ? { session: null, date: today() } : null);
+  const [form, setForm] = useState<{ session: Session | null; date: string; template?: Session | null } | null>(devSheet === 'form' ? { session: null, date: today() } : null);
   const [paywall, setPaywall] = useState<string | null>(devSheet === 'paywall' ? '店舗・場ごとの収支' : devSheet === 'intro' ? INTRO : null);
   const [toastMsg, setToastMsg] = useState('');
   const [toastAct, setToastAct] = useState<{ label: string; run: () => void } | null>(null);
@@ -106,7 +121,7 @@ export default function App() {
   }, [unlockUntil]);
 
   // バナーは分析と設定だけ。シートが開いている間は隠す(ネイティブの広告はシートの上に重なるため)
-  const bannerVisible = ads.allowed && !premium && !!data && (tab === 'analysis' || tab === 'settings') && !form && !paywall;
+  const bannerVisible = ads.allowed && !premium && !!data && (tab === 'analysis' || tab === 'settings') && !form && !paywall && !layer;
   useEffect(() => {
     void setBanner(bannerVisible, bannerMargin(), setAdHeight);
   }, [bannerVisible]);
@@ -122,6 +137,7 @@ export default function App() {
   back.current = () => {
     if (paywall) setPaywall(null);
     else if (form) setForm(null);
+    else if (layer) setLayer(null);
     else if (tab !== 'home') setTab('home');
     else void NativeApp.minimizeApp();
   };
@@ -139,8 +155,8 @@ export default function App() {
 
   // カウンターを開いている間は画面を消さない
   useEffect(() => {
-    void keepAwake(tab === 'counter');
-  }, [tab]);
+    void keepAwake(layer?.kind === 'counter');
+  }, [layer]);
 
   // 文字の大きさ
   const fontScale = data?.settings.fontScale ?? 1;
@@ -244,6 +260,7 @@ export default function App() {
   const remove = (id: string) => {
     mutate((d) => ({ ...d, sessions: d.sessions.filter((x) => x.id !== id) }));
     setForm(null);
+    setLayer(null);
     toast('消しました');
   };
   const setSettings = (settings: Settings) => mutate((d) => ({ ...d, settings }));
@@ -311,43 +328,75 @@ export default function App() {
 
   const lastKind = data.sessions.length ? [...data.sessions].sort((a, b) => b.updatedAt - a.updatedAt)[0].kind : 'pachinko';
 
+  // 記録詳細: ?view=detail のときは見本データの最新の記録を出す
+  const detail = layer?.kind === 'detail'
+    ? data.sessions.find((x) => x.id === layer.id) ?? (layer.id === '' ? newestFirst(data.sessions)[0] : undefined)
+    : undefined;
+  const openDetail = (s: Session) => setLayer({ kind: 'detail', id: s.id });
+  const addAt = (date: string) => setForm({ session: null, date });
+  const fabDate = tab === 'calendar' ? selected : today();
+
   return (
     <div className={`app win-${data.settings.winColor}`}>
-      <main>
+      <main hidden={!!layer}>
         {tab === 'home' && (
-          <Home data={data} month={month} setMonth={setMonth} selected={selected} setSelected={setSelected}
-            onEdit={(s) => setForm({ session: s, date: s.date })} onAdd={(d) => setForm({ session: null, date: d })} onShare={() => void shareMonth()} />
+          <Home data={data} month={month} setMonth={setMonth} premium={access} onOpen={openDetail} onShare={() => void shareMonth()}
+            onPaywall={setPaywall} onLimit={() => setLayer({ kind: 'limit' })} onHistory={() => setTab('history')}
+            onAnalysis={() => setTab('analysis')} onCounter={() => setLayer({ kind: 'counter' })} />
+        )}
+        {tab === 'history' && <History data={data} month={month} setMonth={setMonth} onOpen={openDetail} />}
+        {tab === 'calendar' && (
+          <CalendarPage data={data} month={month} setMonth={setMonth} selected={selected} setSelected={setSelected} onOpen={openDetail} onAdd={addAt} />
         )}
         {tab === 'analysis' && <Analysis data={data} premium={access} unlockedUntil={!premium && access ? untilText(unlockUntil) : null} onPaywall={setPaywall} />}
-        {tab === 'counter' && (
-          <Counter data={data} premium={access} onPaywall={setPaywall} setCounter={setCounter}
-            saveMachine={saveMachine} deleteMachine={deleteMachine} toast={toast} />
-        )}
         {tab === 'settings' && (
           <SettingsPage data={data} premium={premium} setSettings={setSettings} replaceData={commit}
             onPaywall={setPaywall} onRestore={doRestore} toast={toast}
+            onLimit={() => setLayer({ kind: 'limit' })} onCounter={() => setLayer({ kind: 'counter' })}
             onPrivacyOptions={ads.privacyOptions ? () => void showPrivacyOptions() : undefined} />
         )}
       </main>
 
+      {layer && (
+        <main className="layer">
+          {layer.kind === 'detail' && (detail ? (
+            <Detail data={data} session={detail} premium={access} onBack={() => setLayer(null)} onGo={openDetail}
+              onEdit={(x) => setForm({ session: x, date: x.date })}
+              onCopy={(x) => setForm({ session: null, date: today(), template: x })}
+              onDelete={remove} onPaywall={setPaywall} />
+          ) : <div className="page"><BackHead title="記録詳細" onBack={() => setLayer(null)} center /><p className="empty-card">この記録は見つかりませんでした</p></div>)}
+          {layer.kind === 'limit' && <LimitPage data={data} setSettings={setSettings} toast={toast} onBack={() => setLayer(null)} />}
+          {layer.kind === 'counter' && (
+            <div className="page counter-page">
+              <BackHead title="小役カウンター" sub="数えている間は画面が消えません。" onBack={() => setLayer(null)} />
+              <Counter data={data} premium={access} onPaywall={setPaywall} setCounter={setCounter}
+                saveMachine={saveMachine} deleteMachine={deleteMachine} toast={toast} />
+            </div>
+          )}
+        </main>
+      )}
+
       {adsMock && bannerVisible && <div className="ad-mock" aria-hidden="true">広告(開発用の見本)</div>}
 
-      {tab === 'home' && (
-        <button className="fab" aria-label="収支を記入" onClick={() => setForm({ session: null, date: selected })}>+</button>
+      {!layer && (tab === 'home' || tab === 'history' || tab === 'calendar') && (
+        <button className="fab" aria-label="収支を記録" onClick={() => addAt(fabDate)}><Icon name="plus" size={30} /></button>
       )}
 
       <nav className="tabbar" aria-label="画面の切り替え">
-        {TABS.map((t) => (
-          <button key={t.id} className={tab === t.id ? 'on' : ''} aria-current={tab === t.id ? 'page' : undefined} onClick={() => setTab(t.id)}>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d={t.icon} /></svg>
-            <span>{t.label}</span>
-          </button>
-        ))}
+        {TABS.map((t) => {
+          const on = tab === t.id && !layer;
+          return (
+            <button key={t.id} className={on ? 'on' : ''} aria-current={on ? 'page' : undefined} onClick={() => { setLayer(null); setTab(t.id); }}>
+              <Icon name={t.icon} size={24} />
+              <span>{t.label}</span>
+            </button>
+          );
+        })}
       </nav>
 
       {form && (
-        <SessionForm initial={form.session} date={form.date} history={data.sessions} lastKind={lastKind}
-          onSave={upsert} onDelete={remove} onClose={() => setForm(null)} />
+        <SessionForm key={form.session?.id ?? `new-${form.template?.id ?? ''}`} initial={form.session} template={form.template} date={form.date}
+          history={data.sessions} lastKind={lastKind} onSave={upsert} onDelete={remove} onClose={() => setForm(null)} />
       )}
       {paywall && (
         <Paywall why={paywall} billing={billing} onBuy={buy} onRestore={doRestore} onClose={() => setPaywall(null)}

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { shortYen, signedYen, monthJa, dateJa } from './format';
+import { shortYen, signedEn as signedYen, monthJa, dateJa } from './format';
 
 const H = 180;
 const PAD = { l: 48, r: 12, t: 12, b: 24 };
@@ -138,5 +138,69 @@ export function MonthlyBars({ rows }: { rows: { month: string; profit: number }[
         })}
       </svg>
     </figure>
+  );
+}
+
+/** ホームの「月別収支の推移」: 小さな置き場所に収まる棒。0 の線の上が勝ち、下が負け */
+export function CompactBars({ rows, height = 190 }: { rows: { label: string; value: number }[]; height?: number }) {
+  const [box, W] = useWidth<HTMLDivElement>();
+  const vals = rows.map((r) => r.value);
+  const ticks = niceTicks(Math.min(0, ...vals), Math.max(0, ...vals, 1), 3);
+  const min = ticks[0], max = ticks[ticks.length - 1];
+  const L = 40, R = 6, T = 8, B = 22;
+  const w = Math.max(160, W);
+  const iw = w - L - R, ih = height - T - B;
+  const y = (v: number) => T + (1 - (v - min) / (max - min || 1)) * ih;
+  const slot = iw / Math.max(1, rows.length);
+  const bw = Math.min(22, slot * 0.58);
+  return (
+    <div className="cbars" ref={box}>
+      <svg viewBox={`0 0 ${w} ${height}`} width={w} height={height} role="img" aria-label="月別収支の推移">
+        {ticks.map((t) => (
+          <g key={t}>
+            <line x1={L} x2={w - R} y1={y(t)} y2={y(t)} className={t === 0 ? 'axis-zero' : 'grid'} />
+            <text x={L - 6} y={y(t) + 3.5} className="tick" textAnchor="end">{manYenTick(t)}</text>
+          </g>
+        ))}
+        {rows.map((r, i) => {
+          const cx = L + slot * i + slot / 2;
+          const top = Math.min(y(r.value), y(0));
+          const h = r.value === 0 ? 0 : Math.max(2, Math.abs(y(r.value) - y(0)));
+          return (
+            <g key={r.label + i}>
+              <line x1={cx} x2={cx} y1={T} y2={T + ih} className="grid v" />
+              {h > 0 && <rect x={cx - bw / 2} y={top} width={bw} height={h} rx="2" className={r.value >= 0 ? 'bar-plus' : 'bar-minus'} />}
+              <text x={cx} y={height - 6} className="tick" textAnchor="middle">{r.label}</text>
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
+const manYenTick = (n: number) => (n === 0 ? '0' : Math.abs(n) >= 10000 ? `${n / 10000}万` : n.toLocaleString('ja-JP'));
+
+/** ドーナツ。parts の value の割合で輪を分ける */
+export function Donut({ parts, size = 132, stroke = 18, children }: { parts: { color: string; value: number }[]; size?: number; stroke?: number; children?: React.ReactNode }) {
+  const total = parts.reduce((a, p) => a + Math.max(0, p.value), 0);
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  let acc = 0;
+  return (
+    <div className="donut" style={{ width: size, height: size }}>
+      <svg viewBox={`0 0 ${size} ${size}`} width={size} height={size} aria-hidden="true">
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" className="donut-track" strokeWidth={stroke} />
+        {total > 0 && parts.filter((p) => p.value > 0).map((p, i) => {
+          const len = (p.value / total) * c;
+          const el = (
+            <circle key={i} cx={size / 2} cy={size / 2} r={r} fill="none" stroke={p.color} strokeWidth={stroke}
+              strokeDasharray={`${Math.max(0, len - 1.5)} ${c}`} strokeDashoffset={-acc} transform={`rotate(-90 ${size / 2} ${size / 2})`} />
+          );
+          acc += len;
+          return el;
+        })}
+      </svg>
+      <div className="donut-center">{children}</div>
+    </div>
   );
 }

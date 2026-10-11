@@ -48,8 +48,6 @@ export function Counter({ data, premium, onPaywall, setCounter, saveMachine, del
 
   return (
     <div className="counter">
-      <h1 className="mincho page-title">小役カウンター</h1>
-
       <div className="machine-bar">
         <select aria-label="数える機種" value={machine.id} onChange={(e) => update({ machineId: e.target.value, counts: {}, games: 0 })}>
           {machines.map((m) => <option key={m.id} value={m.id}>{m.name || '(名前なし)'}</option>)}
@@ -91,7 +89,7 @@ ${encodeMachine(machine)}`);
         ))}
       </section>
 
-      <section className="block" aria-label="設定の推測">
+      <section className="card" aria-label="設定の推測">
         <h2 className="mincho sec">設定の推測</h2>
         {premium ? (
           <>
