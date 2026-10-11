@@ -58,16 +58,16 @@ export function Paywall({ why, billing, onBuy, onRestore, onClose, reward }: Pro
 
   return (
     <div className="sheet-backdrop" onClick={onClose}>
-      <div className="sheet paywall" role="dialog" aria-modal="true" aria-label="有料プラン" onClick={(e) => e.stopPropagation()}>
+      <div className="sheet paywall" role="dialog" aria-modal="true" aria-label="完全版" onClick={(e) => e.stopPropagation()}>
         <div className="sheet-head">
           <button className="link-btn" onClick={onClose}>{intro ? 'あとで' : '閉じる'}</button>
-          <h2 className="mincho">有料プラン</h2>
+          <h2 className="mincho">完全版</h2>
           <span />
         </div>
         <div className="sheet-body">
           <div className="pw-hero">
             {trial && <span className="pw-trial-badge">{trial}</span>}
-            <p className="pw-title">{intro ? '記入おつかれさまです' : `「${why}」は有料プランで使えます`}</p>
+            <p className="pw-title">{intro ? '記入おつかれさまです' : `「${why}」は完全版で使えます`}</p>
             <p className="pw-sub">
               {intro
                 ? 'どの店・どの台・どの買い方で負けているか。3回記入した今から、全部の分析を試せます。'
@@ -76,7 +76,7 @@ export function Paywall({ why, billing, onBuy, onRestore, onClose, reward }: Pro
           </div>
 
           <table className="pw-table">
-            <thead><tr><th scope="col" /><th scope="col">無料</th><th scope="col" className="pro">有料</th></tr></thead>
+            <thead><tr><th scope="col" /><th scope="col">無料</th><th scope="col" className="pro">完全版</th></tr></thead>
             <tbody>
               {TABLE.map(([name, free, pro]) => (
                 <tr key={name}><th scope="row">{name}</th><td>{cell(free)}</td><td className="pro">{cell(pro)}</td></tr>

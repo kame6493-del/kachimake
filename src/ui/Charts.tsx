@@ -204,3 +204,95 @@ export function Donut({ parts, size = 132, stroke = 18, children }: { parts: { c
     </div>
   );
 }
+
+/** 見本 01・04 の「収支の推移」: 点つきの折れ線。0 より上は勝ちの色、下は負けの色で、線と面を分ける。
+ *  slots はよこの目盛りの数(1か月なら日数)、points は値のある所だけ */
+export function DotLine({ slots, points, ticks, height = 190 }: { slots: number; points: { i: number; v: number }[]; ticks: { i: number; label: string }[]; height?: number }) {
+  const [box, W] = useWidth<HTMLDivElement>();
+  const w = Math.max(240, W);
+  const L = 50, R = 10, T = 10, B = 24;
+  const iw = w - L - R, ih = height - T - B;
+  const vals = points.map((p) => p.v);
+  const yt = niceTicks(Math.min(0, ...vals), Math.max(0, ...vals, 1), 4);
+  const min = yt[0], max = yt[yt.length - 1];
+  const x = (i: number) => L + (slots <= 1 ? iw / 2 : (i / (slots - 1)) * iw);
+  const y = (v: number) => T + (1 - (v - min) / (max - min || 1)) * ih;
+  const z = y(0);
+  const line = points.map((p, k) => `${k ? 'L' : 'M'}${x(p.i).toFixed(1)},${y(p.v).toFixed(1)}`).join('');
+  const area = points.length ? `${line}L${x(points[points.length - 1].i).toFixed(1)},${z.toFixed(1)}L${x(points[0].i).toFixed(1)},${z.toFixed(1)}Z` : '';
+  const id = `dl${slots}-${points.length}-${Math.round(z)}`;
+  return (
+    <div className="dline" ref={box}>
+      {points.length === 0 ? <div className="chart-empty">この期間の記録はありません</div> : (
+        <svg viewBox={`0 0 ${w} ${height}`} width={w} height={height} role="img" aria-label="収支の推移">
+          <defs>
+            <clipPath id={`${id}a`}><rect x="0" y="0" width={w} height={z} /></clipPath>
+            <clipPath id={`${id}b`}><rect x="0" y={z} width={w} height={height - z} /></clipPath>
+            <linearGradient id={`${id}g`} x1="0" x2="0" y1="0" y2="1"><stop offset="0" stopColor="var(--win)" stopOpacity="0.32" /><stop offset="1" stopColor="var(--win)" stopOpacity="0.02" /></linearGradient>
+            <linearGradient id={`${id}r`} x1="0" x2="0" y1="0" y2="1"><stop offset="0" stopColor="var(--minus)" stopOpacity="0.04" /><stop offset="1" stopColor="var(--minus)" stopOpacity="0.36" /></linearGradient>
+          </defs>
+          {yt.map((t) => (
+            <g key={t}>
+              <line x1={L} x2={w - R} y1={y(t)} y2={y(t)} className={t === 0 ? 'axis-zero' : 'grid'} />
+              <text x={L - 6} y={y(t) + 4} className="tick" textAnchor="end">{t.toLocaleString('ja-JP')}</text>
+            </g>
+          ))}
+          {ticks.map((t) => (
+            <g key={t.i}>
+              <line x1={x(t.i)} x2={x(t.i)} y1={T} y2={T + ih} className="grid v" />
+              <text x={x(t.i)} y={height - 6} className="tick" textAnchor={t.i >= slots - 1 && slots > 1 ? 'end' : 'middle'}>{t.label}</text>
+            </g>
+          ))}
+          <line x1={L} x2={L} y1={T} y2={T + ih} className="axis-zero" />
+          <path d={area} fill={`url(#${id}g)`} clipPath={`url(#${id}a)`} />
+          <path d={area} fill={`url(#${id}r)`} clipPath={`url(#${id}b)`} />
+          <path d={line} className="dl-line plus" fill="none" clipPath={`url(#${id}a)`} />
+          <path d={line} className="dl-line minus" fill="none" clipPath={`url(#${id}b)`} />
+          {points.map((p) => <circle key={p.i} cx={x(p.i)} cy={y(p.v)} r="3.6" className={`dl-dot ${p.v >= 0 ? 'plus' : 'minus'}`} />)}
+        </svg>
+      )}
+    </div>
+  );
+}
+
+/** 見本 04 の「種目別 収支比較」「曜日別 収支」: 0 の線から上下に伸びる棒。下に名前(と絵) */
+export function SignedBars({ rows, height = 170, color }: { rows: { label: string; value: number; icon?: React.ReactNode }[]; height?: number; color?: 'gold' }) {
+  const [box, W] = useWidth<HTMLDivElement>();
+  const w = Math.max(200, W);
+  const L = 50, R = 6, T = 8, B = rows.some((r) => r.icon) ? 6 : 22;
+  const iw = w - L - R, ih = height - T - B;
+  const vals = rows.map((r) => r.value);
+  const yt = niceTicks(Math.min(0, ...vals), Math.max(0, ...vals, 1), 4);
+  const min = yt[0], max = yt[yt.length - 1];
+  const y = (v: number) => T + (1 - (v - min) / (max - min || 1)) * ih;
+  const slot = iw / Math.max(1, rows.length);
+  const bw = Math.min(30, slot * 0.55);
+  return (
+    <div className="sbars" ref={box}>
+      <svg viewBox={`0 0 ${w} ${height}`} width={w} height={height} role="img" aria-label={rows.map((r) => `${r.label} ${r.value.toLocaleString('ja-JP')}円`).join('、')}>
+        {yt.map((t) => (
+          <g key={t}>
+            <line x1={L} x2={w - R} y1={y(t)} y2={y(t)} className={t === 0 ? 'axis-zero' : 'grid'} />
+            <text x={L - 6} y={y(t) + 4} className="tick" textAnchor="end">{t.toLocaleString('ja-JP')}</text>
+          </g>
+        ))}
+        {rows.map((r, i) => {
+          const cx = L + slot * i + slot / 2;
+          const h = r.value === 0 ? 0 : Math.max(2, Math.abs(y(r.value) - y(0)));
+          return (
+            <g key={r.label}>
+              <line x1={L + slot * (i + 1)} x2={L + slot * (i + 1)} y1={T} y2={T + ih} className="grid v" />
+              {h > 0 && <rect x={cx - bw / 2} y={Math.min(y(r.value), y(0))} width={bw} height={h} className={color === 'gold' ? 'bar-gold' : r.value >= 0 ? 'bar-plus' : 'bar-minus'} />}
+              {!r.icon && <text x={cx} y={height - 5} className="tick" textAnchor="middle">{r.label}</text>}
+            </g>
+          );
+        })}
+      </svg>
+      {rows.some((r) => r.icon) && (
+        <div className="sbars-labels" style={{ paddingLeft: L, paddingRight: R }}>
+          {rows.map((r) => <span key={r.label}>{r.icon}<small>{r.label}</small></span>)}
+        </div>
+      )}
+    </div>
+  );
+}

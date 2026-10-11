@@ -1,19 +1,22 @@
-// 記録を追加・直す(見本 07)。保存する記録の形は 1.1.0 と同じ
+// 記録を追加・直す(見本 kachi2_ref_02)。保存する記録の形は 1.1.0 と同じ
 import { useMemo, useState } from 'react';
 import { BET_TYPES, DEFAULT_TAGS, KINDS, RATES, type Kind, type Session } from '../domain/types';
 import { newId } from '../domain/data';
 import { ballsToYen, frequent, latest, stock, usedTags } from '../domain/stats';
-import { en, signedEn, tone } from './format';
+import { en, tone } from './format';
 import { BackHead, Icon, KindIcon, kindShort } from './parts';
 
 interface Props {
   initial: Session | null;
   /** 複製するときの元(種目・店・機種・レート・券種・タグを写す) */
   template?: Session | null;
+  /** 小役カウンターの「記録に反映」から開いたときの下書き */
+  preset?: { kind: Kind; target: string; memo: string };
   date: string;
   history: Session[];
   lastKind: Kind;
-  onSave: (s: Session) => void;
+  /** cont=true は「保存して続ける」(同じ店・種目のまま次を書く) */
+  onSave: (s: Session, cont: boolean) => void;
   onDelete: (id: string) => void;
   onClose: () => void;
 }
@@ -39,26 +42,26 @@ function BallField({ label, value, onChange, u, rate }: { label: string; value: 
 }
 
 /** 名前の候補をボタンで出す。スマホの入力候補の一覧は押しにくいため */
-function Chips({ items, value, onPick, pin }: { items: string[]; value: string; onPick: (v: string) => void; pin?: boolean }) {
+function Chips({ items, value, onPick }: { items: string[]; value: string; onPick: (v: string) => void }) {
   if (items.length === 0) return null;
   return (
     <div className="hchips">
       {items.map((x) => (
         <button type="button" key={x} className={`chip ${x === value ? 'on' : ''}`} onClick={() => onPick(x === value ? '' : x)}>
-          {pin && <Icon name="pin" size={15} />}{x}
+          {x}
         </button>
       ))}
     </div>
   );
 }
 
-export function SessionForm({ initial, template, date, history, lastKind, onSave, onDelete, onClose }: Props) {
+export function SessionForm({ initial, template, preset, date, history, lastKind, onSave, onDelete, onClose }: Props) {
   const src = initial ?? template ?? null;
   const initRate = src?.rate ?? 0;
   const [d, setD] = useState(initial?.date ?? date);
-  const [kind, setKind] = useState<Kind>(src?.kind ?? lastKind);
+  const [kind, setKind] = useState<Kind>(src?.kind ?? preset?.kind ?? lastKind);
   const [place, setPlace] = useState(src?.place ?? '');
-  const [target, setTarget] = useState(src?.target ?? '');
+  const [target, setTarget] = useState(src?.target ?? preset?.target ?? '');
   // 投資・回収の欄は現金だけ。貯玉の分は下の欄で足す
   const [invest, setInvest] = useState(initial ? String(initial.invest - ballsToYen(initial.replay ?? 0, initRate) || '') : '');
   const [payout, setPayout] = useState(initial ? String(initial.payout - ballsToYen(initial.saved ?? 0, initRate) || '') : '');
@@ -71,7 +74,7 @@ export function SessionForm({ initial, template, date, history, lastKind, onSave
   const [betType, setBetType] = useState(src?.betType ?? '');
   const [tags, setTags] = useState<string[]>(src?.tags ?? []);
   const [newTag, setNewTag] = useState('');
-  const [memo, setMemo] = useState(initial?.memo ?? '');
+  const [memo, setMemo] = useState(initial?.memo ?? preset?.memo ?? '');
   const [confirmDel, setConfirmDel] = useState(false);
   const [active, setActive] = useState<Active>('invest');
 
@@ -90,7 +93,7 @@ export function SessionForm({ initial, template, date, history, lastKind, onSave
     return { place: count('place'), target: count('target'), placeChips: frequent(history, kind, 'place'), targetChips: frequent(history, kind, 'target') };
   }, [history, kind]);
   const tagChoices = useMemo(() => [...new Set([...usedTags(history), ...DEFAULT_TAGS, ...tags])].slice(0, 14), [history, tags]);
-  const last = useMemo(() => (initial || template ? null : latest(history)), [history, initial, template]);
+  const last = useMemo(() => (initial || template || preset ? null : latest(history)), [history, initial, template, preset]);
   // この店の貯玉(直している記入の分は除いて数える)
   const stockHere = useMemo(() => {
     if (!isHall || !place.trim()) return null;
@@ -119,16 +122,7 @@ export function SessionForm({ initial, template, date, history, lastKind, onSave
     setNewTag('');
   };
 
-  // 下の数字の板: 選んでいる金額の欄に打つ
-  const cur = active === 'invest' ? invest : payout;
-  const setCur = active === 'invest' ? setInvest : setPayout;
-  const key = (k: string) => {
-    if (k === 'back') return setCur(cur.slice(0, -1));
-    if (k === 'clear') return setCur('');
-    setCur(digits(cur + k));
-  };
-
-  const save = () => {
+  const save = (cont: boolean) => {
     if (!valid) return;
     const now = Date.now();
     const balls = isHall && useBalls;
@@ -149,68 +143,53 @@ export function SessionForm({ initial, template, date, history, lastKind, onSave
       tags: tags.length ? tags : undefined,
       createdAt: initial?.createdAt ?? now,
       updatedAt: now,
-    });
+    }, cont);
   };
 
-  const amountBox = (which: Active, label: string, icon: string, value: string, set: (v: string) => void, steps: number[]) => (
-    <div className={`card form-card amount-card ${active === which ? 'active' : ''}`}>
-      <div className="fc-head"><Icon name={icon} className={which === 'payout' ? 'ic-green' : 'ic-blue'} /><span>{label}</span></div>
+  const amountBox = (which: Active, label: string, icon: string, value: string, set: (v: string) => void) => (
+    <div className={`card amount-card ${active === which ? 'active' : ''}`}>
+      <div className="fc-head"><Icon name={icon} size={24} className="ic-gold" /><span>{label}</span></div>
       <label className="amount-box">
-        <input inputMode="none" aria-label={label} placeholder="0" value={fmt(value)} onFocus={() => setActive(which)}
+        <input inputMode="numeric" aria-label={label} placeholder="0" value={fmt(value)} onFocus={() => setActive(which)}
           onChange={(e) => set(digits(e.target.value))} />
         <span>円</span>
+        {value && <button type="button" className="clear-x" aria-label={`${label}を消す`} onClick={() => set('')}><Icon name="close" size={14} /></button>}
       </label>
       <div className="steps">
-        {steps.map((n) => (
-          <button type="button" key={n} onClick={() => { setActive(which); set(n === 0 ? '' : String(toNum(value) + n)); }}>
-            {n === 0 ? '0' : `+${n.toLocaleString('ja-JP')}`}
+        {[1000, 5000, 10000].map((n) => (
+          <button type="button" key={n} aria-label={`${label}に${n.toLocaleString('ja-JP')}円足す`} onClick={() => { setActive(which); set(String(toNum(value) + n)); }}>
+            {n.toLocaleString('ja-JP')}
           </button>
         ))}
       </div>
     </div>
   );
+  const result = investYen === 0 && payoutYen === 0 ? null : p > 0 ? 'win' : p < 0 ? 'lose' : 'draw';
 
   return (
     <div className="page-layer" role="dialog" aria-modal="true" aria-label={initial ? '記録を直す' : '記録を追加'}>
       <div className="page form-page">
-        <BackHead title={initial ? '記録を直す' : '記録を追加'} sub="遊びの収支を記録しましょう。" onBack={onClose} />
+        <BackHead title={initial ? '記録を直す' : '記録を追加'} onBack={onClose} />
+
+        <div className="kind-tiles" role="radiogroup" aria-label="種目">
+          {KINDS.map((k) => (
+            <button key={k.id} role="radio" aria-checked={kind === k.id} className={`ktile ${kind === k.id ? 'on' : ''}`} onClick={() => setKind(k.id)}>
+              <KindIcon kind={k.id} size={30} /><span>{kindShort(k.id)}</span>
+            </button>
+          ))}
+        </div>
 
         {last && (
           <button type="button" className="copy-last" onClick={copyLast}>
             <Icon name="copy" size={18} />
             <span>前回と同じ</span>
-            <small>{[KINDS.find((k) => k.id === last.kind)?.label, last.place, last.target].filter(Boolean).join('・')}</small>
+            <small>{[kindShort(last.kind), last.place, last.target].filter(Boolean).join('・')}</small>
           </button>
         )}
 
-        <div className="card form-card">
-          <div className="fc-head"><Icon name="game" /><span>種目</span></div>
-          <div className="kind-pick" role="radiogroup" aria-label="種目">
-            {KINDS.map((k) => (
-              <button key={k.id} role="radio" aria-checked={kind === k.id} className={`kchip ${kind === k.id ? 'on' : ''}`} onClick={() => setKind(k.id)}>
-                <KindIcon kind={k.id} size={22} />{kindShort(k.id)}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="form-pair">
-          <label className="card form-card">
-            <span className="fc-head"><Icon name="calendar" /><span>日付</span></span>
-            <input type="date" value={d} onChange={(e) => setD(e.target.value)} />
-          </label>
-          <div className="card form-card">
-            <div className="fc-head"><Icon name="clock" /><span>{isRace ? '観戦時間' : '遊技時間'}</span></div>
-            <div className="time-row">
-              <input inputMode="numeric" aria-label="時間" value={h} placeholder="0" onChange={(e) => setH(digits(e.target.value).slice(0, 2))} /><span>時間</span>
-              <input inputMode="numeric" aria-label="分" value={mi} placeholder="0" onChange={(e) => setMi(String(Math.min(59, toNum(digits(e.target.value).slice(0, 2)))).replace(/^0$/, ''))} /><span>分</span>
-            </div>
-          </div>
-        </div>
-
         {isHall && (
-          <div className="card form-card">
-            <div className="fc-head"><Icon name="yen" /><span>レート(1{unit(kind)}あたり)</span></div>
+          <div className="rate-row">
+            <span>レート<small>(1{unit(kind)})</small></span>
             <div className="opts">
               {rates.map((r) => (
                 <button type="button" key={r} aria-pressed={effRate === r} className={`opt ${effRate === r ? 'on' : ''}`} onClick={() => setRate(r)}>{r}円</button>
@@ -220,12 +199,12 @@ export function SessionForm({ initial, template, date, history, lastKind, onSave
         )}
 
         <div className="form-pair">
-          {amountBox('invest', isRace ? '購入額' : isHall && useBalls ? '使った額(現金)' : '使った額', 'wallet', invest, setInvest, [1000, 5000, 10000])}
-          {amountBox('payout', isRace ? '払戻' : isHall && useBalls ? '戻った額(換金)' : '戻った額', 'trendUp', payout, setPayout, [0, 5000, 10000])}
+          {amountBox('invest', isRace ? '購入額' : isHall && useBalls ? '使った額(現金)' : '使った額', 'wallet', invest, setInvest)}
+          {amountBox('payout', isRace ? '払戻' : isHall && useBalls ? '戻った額(換金)' : '戻った額', 'coins', payout, setPayout)}
         </div>
 
         {isHall && (
-          <div className="card form-card balls">
+          <div className="card balls">
             <button type="button" className="balls-toggle" aria-expanded={useBalls} onClick={() => setUseBalls(!useBalls)}>
               <span>貯{unit(kind) === '玉' ? '玉' : 'メダル'}を使った・貯めた</span>
               <Icon name={useBalls ? 'up' : 'down'} size={18} />
@@ -242,78 +221,89 @@ export function SessionForm({ initial, template, date, history, lastKind, onSave
           </div>
         )}
 
-        <div className="card form-card">
-          <div className="fc-head"><Icon name="store" /><span>{isRace ? '場' : '場所'}</span>{suggest.placeChips.length > 0 && <small className="fc-right">履歴から選択</small>}</div>
-          <input list="dl-place" value={place} placeholder={isRace ? '例: ネット投票' : '例: 駅前の店'} aria-label={isRace ? '場' : '店舗'} onChange={(e) => setPlace(e.target.value)} />
-          <datalist id="dl-place">{suggest.place.map((x) => <option key={x} value={x} />)}</datalist>
-          <Chips items={suggest.placeChips} value={place} onPick={setPlace} pin />
+        <div className="card result-bar" aria-live="polite">
+          <span>今回の収支</span>
+          <b className={`money ${tone(p)}`}>{p > 0 ? '+' : p < 0 ? '-' : '±'}{Math.abs(p).toLocaleString('ja-JP')}<small>円</small></b>
         </div>
 
-        <div className="card form-card">
-          <div className="fc-head"><Icon name="counter" /><span>{isRace ? 'レース' : '機種'}</span>{suggest.targetChips.length > 0 && <small className="fc-right">履歴から選択</small>}</div>
-          <span className="clear-box">
-            <input list="dl-target" value={target} placeholder={isRace ? '例: 11R' : '例: 機種名'} aria-label={isRace ? 'レース' : '機種'} onChange={(e) => setTarget(e.target.value)} />
-            {target && <button type="button" aria-label="消す" onClick={() => setTarget('')}><Icon name="close" size={18} /></button>}
-          </span>
-          <datalist id="dl-target">{suggest.target.map((x) => <option key={x} value={x} />)}</datalist>
-          <Chips items={suggest.targetChips} value={target} onPick={setTarget} />
-        </div>
-
-        {isRace && (
-          <label className="card form-card">
-            <span className="fc-head"><Icon name="tag" /><span>券種</span></span>
-            <select value={betType} onChange={(e) => setBetType(e.target.value)}>
-              <option value="">(未設定)</option>
-              {BET_TYPES.map((b) => <option key={b} value={b}>{b}</option>)}
-            </select>
+        <div className="card form-rows">
+          <div className="frow">
+            <span className="fr-label"><Icon name="building" size={24} />{isRace ? '場' : 'お店・場'}</span>
+            <div className="fr-field">
+              <input list="dl-place" value={place} placeholder={isRace ? '例: ネット投票' : '例: 駅前の店'} aria-label={isRace ? '場' : 'お店・場'} onChange={(e) => setPlace(e.target.value)} />
+              <datalist id="dl-place">{suggest.place.map((x) => <option key={x} value={x} />)}</datalist>
+              <Chips items={suggest.placeChips} value={place} onPick={setPlace} />
+            </div>
+          </div>
+          <div className="frow">
+            <span className="fr-label"><Icon name="counter" size={24} />{isRace ? 'レース' : '機種・レース'}</span>
+            <div className="fr-field">
+              <span className="clear-box">
+                <input list="dl-target" value={target} placeholder={isRace ? '例: 11R' : '例: 機種名'} aria-label={isRace ? 'レース' : '機種'} onChange={(e) => setTarget(e.target.value)} />
+                {target && <button type="button" aria-label="消す" onClick={() => setTarget('')}><Icon name="close" size={16} /></button>}
+              </span>
+              <datalist id="dl-target">{suggest.target.map((x) => <option key={x} value={x} />)}</datalist>
+              <Chips items={suggest.targetChips} value={target} onPick={setTarget} />
+            </div>
+          </div>
+          {isRace && (
+            <label className="frow">
+              <span className="fr-label"><Icon name="tag" size={24} />券種</span>
+              <select value={betType} onChange={(e) => setBetType(e.target.value)}>
+                <option value="">(未設定)</option>
+                {BET_TYPES.map((b) => <option key={b} value={b}>{b}</option>)}
+              </select>
+            </label>
+          )}
+          <label className="frow">
+            <span className="fr-label"><Icon name="calendar" size={24} />日付<em className="req">必須</em></span>
+            <input type="date" value={d} onChange={(e) => setD(e.target.value)} />
           </label>
-        )}
-
-        <label className="card form-card">
-          <span className="fc-head"><Icon name="memo" /><span>メモ(任意)</span><small className="fc-right muted">{memo.length} / 1000</small></span>
-          <textarea rows={2} value={memo} maxLength={1000} placeholder="例)朝イチ、イベント日、回転率が良い など" onChange={(e) => setMemo(e.target.value)} />
-        </label>
-
-        <div className="card form-card">
-          <div className="fc-head"><Icon name="tag" /><span>タグ(任意)</span><small className="fc-right">複数選択できます</small></div>
-          <div className="chips">
-            {tagChoices.map((t) => (
-              <button type="button" key={t} aria-pressed={tags.includes(t)} className={`chip ${tags.includes(t) ? 'on' : ''}`} onClick={() => toggleTag(t)}>{t}</button>
-            ))}
+          <div className="frow">
+            <span className="fr-label"><Icon name="clock" size={24} />{isRace ? '観戦時間' : '遊技時間'}</span>
+            <div className="time-row">
+              <input inputMode="numeric" aria-label="時間" value={h} placeholder="0" onChange={(e) => setH(digits(e.target.value).slice(0, 2))} /><span>時間</span>
+              <input inputMode="numeric" aria-label="分" value={mi} placeholder="0" onChange={(e) => setMi(String(Math.min(59, toNum(digits(e.target.value).slice(0, 2)))).replace(/^0$/, ''))} /><span>分</span>
+            </div>
           </div>
-          <div className="inline nowrap">
-            <input value={newTag} maxLength={20} placeholder="タグを足す(例: 7のつく日)" aria-label="新しいタグ"
-              onChange={(e) => setNewTag(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTag(); } }} />
-            <button type="button" className="btn-line" disabled={!newTag.trim()} onClick={addTag}>足す</button>
+          <label className="frow top">
+            <span className="fr-label"><Icon name="doc" size={24} />メモ</span>
+            <span className="memo-box">
+              <textarea rows={3} value={memo} maxLength={1000} placeholder="例) 回転数、朝イチ、イベント日 など" onChange={(e) => setMemo(e.target.value)} />
+              <small>{memo.length}/1000</small>
+            </span>
+          </label>
+          <div className="frow">
+            <span className="fr-label"><Icon name="trophy" size={24} />結果</span>
+            <div className="result-pick" aria-label="結果(金額から自動で決まります)">
+              <span className={`rp win ${result === 'win' ? 'on' : ''}`}><Icon name="trophy" size={18} />勝ち</span>
+              <span className={`rp lose ${result === 'lose' ? 'on' : ''}`}><Icon name="frown" size={18} />負け</span>
+              <span className={`rp draw ${result === 'draw' ? 'on' : ''}`}><Icon name="dash" size={18} />引き分け</span>
+            </div>
           </div>
-        </div>
-
-        <div className="card form-card preview" aria-live="polite">
-          <div className="fc-head"><Icon name="bars3" className="ic-blue" /><span>収支プレビュー</span><small className="fc-right muted">{isHall && useBalls && (toNum(replay) > 0 || toNum(saved) > 0) ? '玉も円にして計算' : '自動で計算します'}</small></div>
-          <div className="pv-row">
-            <div><small>{isRace ? '払戻' : '戻った額'}</small><b>{en(payoutYen)}</b></div>
-            <span className="op">−</span>
-            <div><small>{isRace ? '購入額' : '使った額'}</small><b>{en(investYen)}</b></div>
-            <span className="op">=</span>
-            <div className={`pv-res ${tone(p)}`}><small>今回の収支</small><b>{signedEn(p)}</b></div>
-          </div>
-        </div>
-
-        <div className="keypad" aria-label={`数字(${active === 'invest' ? '使った額' : '戻った額'}に入ります)`}>
-          <div className="kp-side">
-            <button type="button" onClick={() => setActive(active === 'invest' ? 'payout' : 'invest')}>
-              <Icon name={active === 'invest' ? 'wallet' : 'trendUp'} size={20} />
-              <span>{active === 'invest' ? (isRace ? '購入額' : '使った額') : (isRace ? '払戻' : '戻った額')}</span>
-            </button>
-            <button type="button" onClick={() => key('clear')} aria-label="0にする">C</button>
-          </div>
-          <div className="kp-grid">
-            {['7', '8', '9', '4', '5', '6', '1', '2', '3', '0', '00'].map((k) => (
-              <button type="button" key={k} onClick={() => key(k)}>{k}</button>
-            ))}
-            <button type="button" onClick={() => key('back')} aria-label="1文字消す"><Icon name="backspace" size={20} /></button>
+          <div className="frow top">
+            <span className="fr-label"><Icon name="tag" size={24} />タグ</span>
+            <div className="fr-field">
+              <div className="chips">
+                {tagChoices.map((t) => (
+                  <button type="button" key={t} aria-pressed={tags.includes(t)} className={`chip ${tags.includes(t) ? 'on' : ''}`} onClick={() => toggleTag(t)}>{t}</button>
+                ))}
+              </div>
+              <div className="inline nowrap">
+                <input value={newTag} maxLength={20} placeholder="タグを足す(例: 7のつく日)" aria-label="新しいタグ"
+                  onChange={(e) => setNewTag(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTag(); } }} />
+                <button type="button" className="btn-line" disabled={!newTag.trim()} onClick={addTag}>足す</button>
+              </div>
+              <small className="note">あとから見返しやすくするためのタグです(複数選択できます)</small>
+            </div>
           </div>
         </div>
+
+        <div className="card local-note">
+          <Icon name="shield" size={28} className="ic-blue-soft" />
+          <p>この記録はお使いの端末の中にだけ保存されます。<br /><small>サーバーには送られず、ほかの端末からは見られません。</small></p>
+        </div>
+
         {!valid && investYen === 0 && payoutYen === 0 && <p className="note center">使った額か戻った額のどちらかを入れると保存できます</p>}
 
         {initial && (
@@ -329,7 +319,8 @@ export function SessionForm({ initial, template, date, history, lastKind, onSave
         )}
       </div>
       <div className="save-bar">
-        <button className="save-btn" disabled={!valid} onClick={save}><Icon name="check" size={22} />{initial ? '直して保存する' : '記録を保存する'}</button>
+        {!initial && <button className="btn-outline-gold" disabled={!valid} onClick={() => save(true)}>保存して続ける</button>}
+        <button className="btn-gold" disabled={!valid} onClick={() => save(false)}>{initial ? '直して保存' : '保存'}</button>
       </div>
     </div>
   );

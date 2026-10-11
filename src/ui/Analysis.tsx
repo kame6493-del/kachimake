@@ -1,157 +1,192 @@
+// 分析(見本 kachi2_ref_04): 期間の合計・回収率・1回あたり・最多収支の種目、収支の推移、種目別の比較と投資割合、
+// 場所などごとの収支比較(完全版)、曜日別の収支、CSV書き出し(完全版)
 import { useMemo, useState } from 'react';
-import type { AppData } from '../domain/types';
-import { KINDS, kindInfo } from '../domain/types';
-import { byKind, cumulative, groupBy, inRange, monthly, summarize, type GroupKey } from '../domain/stats';
-import { addMonths, monthRange, today } from '../domain/data';
-import { CumulativeChart, MonthlyBars } from './Charts';
-import { hours, pct, signedEn as signedYen, tone, en as yen } from './format';
-import { BrandHead, KindIcon, KIND_COLOR, kindShort } from './parts';
+import type { AppData, Kind, Session } from '../domain/types';
 
-type Period = 'thisMonth' | 'lastMonth' | 'last3' | 'thisYear' | 'all';
-const PERIODS: { id: Period; label: string; free: boolean }[] = [
-  { id: 'thisMonth', label: '今月', free: true },
-  { id: 'lastMonth', label: '先月', free: true },
-  { id: 'last3', label: '3か月', free: false },
-  { id: 'thisYear', label: '今年', free: false },
-  { id: 'all', label: '全期間', free: false },
-];
-const GROUPS: { id: GroupKey; label: string; head: string }[] = [
-  { id: 'place', label: '店舗・場', head: '店舗・場' },
-  { id: 'target', label: '機種・レース', head: '機種・レース' },
-  { id: 'weekday', label: '曜日', head: '曜日' },
-  { id: 'betType', label: '券種', head: '券種' },
-  { id: 'tag', label: 'タグ', head: 'タグ' },
-];
+import { byKind, groupBy, inRange, summarize, weekdayOf, type GroupKey } from '../domain/stats';
+import { addMonths, monthRange, today, toCsv } from '../domain/data';
+import { exportText } from '../platform/files';
+import { Donut, DotLine, SignedBars } from './Charts';
+import { daySeries } from './Home';
+import { Icon, KindIcon, KIND_COLOR, kindShort, Money, MonthSelect, PageHead, Ring, Seg } from './parts';
+import { hours, pct, signedEn, tone } from './format';
 
-function range(p: Period): { from: string; to: string } {
-  const t = today();
-  const m = t.slice(0, 7);
-  if (p === 'thisMonth') return monthRange(m);
-  if (p === 'lastMonth') return monthRange(addMonths(m, -1));
-  if (p === 'last3') return { from: monthRange(addMonths(m, -2)).from, to: monthRange(m).to };
-  if (p === 'thisYear') return { from: `${t.slice(0, 4)}-01-01`, to: `${t.slice(0, 4)}-12-31` };
-  return { from: '0000-01-01', to: '9999-12-31' };
+type Period = 'month' | 'last3' | 'year' | 'all';
+const PERIODS: [Period, string][] = [['month', '今月'], ['last3', '3か月'], ['year', '今年'], ['all', '全期間']];
+type Mode = 'profit' | 'invest' | 'payout';
+const MODES: [Mode, string][] = [['profit', '収支'], ['invest', '投資'], ['payout', '回収']];
+const GROUPS: [Exclude<GroupKey, 'kind' | 'weekday'>, string][] = [['place', '場所'], ['target', '機種'], ['betType', '券種'], ['tag', 'タグ']];
+const WEEK = ['月', '火', '水', '木', '金', '土', '日'];
+const MAIN: Kind[] = ['pachinko', 'slot', 'keiba', 'keirin', 'boat', 'auto'];
+
+const val = (s: { profit: number; invest: number; payout: number }, m: Mode) => (m === 'invest' ? s.invest : m === 'payout' ? s.payout : s.profit);
+
+interface Props {
+  data: AppData;
+  month: string;
+  setMonth: (m: string) => void;
+  premium: boolean;
+  unlockedUntil: string | null;
+  onPaywall: (why: string) => void;
 }
 
-export function Analysis({ data, premium, unlockedUntil, onPaywall }: {
-  data: AppData; premium: boolean; unlockedUntil: string | null; onPaywall: (why: string) => void;
-}) {
-  const [period, setPeriod] = useState<Period>('thisMonth');
-  const [group, setGroup] = useState<GroupKey>('place');
-  const { from, to } = range(period);
+export function Analysis({ data, month, setMonth, premium, unlockedUntil, onPaywall }: Props) {
+  const [period, setPeriod] = useState<Period>('month');
+  const [mode, setMode] = useState<Mode>('profit');
+  const [kmode, setKmode] = useState<Mode>('profit');
+  const [group, setGroup] = useState<(typeof GROUPS)[number][0]>('place');
+  const firstMonth = data.sessions.length ? data.sessions[0].date.slice(0, 7) : month;
+  const now = today().slice(0, 7);
+  // 無料で見られるのは、今月と先月の1か月分(1.1.0 と同じ)
+  const freeMonth = month === now || month === addMonths(now, -1);
+  const locked = !premium && (period !== 'month' || !freeMonth);
+
+  const { from, to, months } = useMemo(() => {
+    if (period === 'month') return { ...monthRange(month), months: [month] };
+    const start = period === 'last3' ? addMonths(month, -2) : period === 'year' ? `${month.slice(0, 4)}-01` : (firstMonth < month ? firstMonth : month);
+    const ms: string[] = [];
+    for (let m = start; m <= month; m = addMonths(m, 1)) ms.push(m);
+    return { from: monthRange(start).from, to: monthRange(month).to, months: ms };
+  }, [period, month, firstMonth]);
   const list = useMemo(() => inRange(data.sessions, from, to), [data.sessions, from, to]);
   const sum = summarize(list);
-  const cum = useMemo(() => cumulative(list), [list]);
   const kinds = byKind(list);
-  const groups = useMemo(() => groupBy(list, group), [list, group]);
-  const months = useMemo(() => monthly(list).map((r) => ({ month: r.month, profit: r.summary.profit })), [list]);
-  const label = PERIODS.find((p) => p.id === period)!.label;
-  const g = GROUPS.find((x) => x.id === group)!;
+  const kindRows = [...MAIN, ...(kinds.has('other') ? ['other' as Kind] : [])].map((k) => ({ k, s: kinds.get(k) ?? summarize([]) }));
+  const best = kindRows.filter((r) => r.s.count > 0).sort((a, b) => b.s.profit - a.s.profit)[0];
 
-  const pick = (p: (typeof PERIODS)[number]) => {
-    if (!p.free && !premium) return onPaywall(`${p.label}の分析`);
-    setPeriod(p.id);
+  const series = period === 'month'
+    ? daySeries(list, month, mode)
+    : {
+      slots: months.length,
+      points: months.map((m, i) => ({ i, s: summarize(list.filter((x) => x.date.startsWith(m))) })).filter((r) => r.s.count > 0).map((r) => ({ i: r.i, v: val(r.s, mode) })),
+      ticks: months.map((m, i) => ({ i, label: `${Number(m.slice(5))}月` })).filter((_, i, a) => a.length <= 7 || i % Math.ceil(a.length / 6) === 0 || i === a.length - 1),
+    };
+
+  const groups = useMemo(() => groupBy(list, group).slice(0, 5), [list, group]);
+  const gMax = Math.max(1, ...groups.map((r) => Math.abs(r.summary.profit)));
+  const week = WEEK.map((w, i) => ({ label: w, value: summarize(list.filter((s) => weekdayOf(s.date) === (i + 1) % 7)).profit }));
+  const investTotal = kindRows.reduce((a, r) => a + r.s.invest, 0);
+
+  const pick = (p: Period) => {
+    if (p !== 'month' && !premium) return onPaywall(`${PERIODS.find((x) => x[0] === p)![1]}の分析`);
+    setPeriod(p);
+  };
+  const csv = async () => {
+    if (!premium) return onPaywall('CSVで書き出し');
+    await exportText(`kachimake-${today()}.csv`, toCsv(list as Session[]), 'text/csv');
   };
 
   return (
-    <div className="analysis">
-      <BrandHead sub="数字で、自分の遊び方を知る。" right={<span className="head-title">分析</span>} />
-      {unlockedUntil && <p className="note unlocked">広告を見たので、{unlockedUntil}まで有料の分析が使えます</p>}
+    <div className="page analysis">
+      <PageHead title="分析" right={<MonthSelect month={month} setMonth={setMonth} first={firstMonth} />} />
+      <div className="center-seg"><Seg label="期間" value={period} onChange={pick} items={PERIODS.map(([p, l]) => [p, p === 'month' && month !== now ? `${Number(month.slice(5))}月` : l] as [Period, string])} /></div>
+      {unlockedUntil && <p className="note unlocked">広告を見たので、{unlockedUntil}まで完全版の分析が使えます</p>}
 
-      <div className="tabs" role="tablist" aria-label="期間">
-        {PERIODS.map((p) => (
-          <button key={p.id} role="tab" aria-selected={period === p.id} className={period === p.id ? 'on' : ''} onClick={() => pick(p)}>
-            {p.label}{!p.free && !premium && <small className="paid">有料</small>}
-          </button>
-        ))}
-      </div>
-
-      <div className="card closing">
-        <div className="closing-label">{label}の収支</div>
-        <div className={`closing-amount ${tone(sum.profit)}`}>{signedYen(sum.profit)}</div>
-        <div className="closing-meta">{sum.count === 0 ? <span>この期間の記入はありません</span> : <span>{sum.count}回の記入</span>}</div>
-      </div>
-
-      <div className="analysis-grid">
-        <section className="card chart-block" aria-label="累計の推移">
-          <h2 className="mincho sec">累計の推移</h2>
-          <CumulativeChart points={cum} />
-        </section>
-
-        <section className="card" aria-label="指標">
-          <h2 className="mincho sec">指標</h2>
-          <dl className="metrics">
-            <div><dt>回収率</dt><dd>{pct(sum.recovery)}</dd></div>
-            <div><dt>勝率</dt><dd>{pct(sum.winRate, 0)}<small>{sum.wins}勝{sum.losses}敗</small></dd></div>
-            <div><dt>時給</dt><dd className={sum.hourly == null ? '' : tone(sum.hourly)}>{sum.hourly == null ? '—' : signedYen(sum.hourly)}<small>{hours(sum.minutes)}</small></dd></div>
-            <div><dt>投資</dt><dd>{yen(sum.invest)}</dd></div>
-            <div><dt>回収</dt><dd>{yen(sum.payout)}</dd></div>
-            <div><dt>1回の最高</dt><dd className={tone(sum.best)}>{signedYen(sum.best)}</dd></div>
-            <div><dt>1回の最低</dt><dd className={tone(sum.worst)}>{signedYen(sum.worst)}</dd></div>
-          </dl>
-        </section>
-
-        <section className="card" aria-label="種類別">
-          <h2 className="mincho sec">種類別</h2>
-          {kinds.size === 0 ? <p className="empty-line">この期間の記入はありません</p> : (
-            <table className="ledger">
-              <thead><tr><th scope="col">種類</th><th scope="col">回数</th><th scope="col">回収率</th><th scope="col">収支</th></tr></thead>
-              <tbody>
-                {KINDS.filter((k) => kinds.has(k.id)).map((k) => {
-                  const s = kinds.get(k.id)!;
-                  return (
-                    <tr key={k.id}>
-                      <th scope="row"><span className="kind-cell"><KindIcon kind={k.id} size={22} />{kindShort(k.id)}</span></th>
-                      <td>{s.count}</td><td>{pct(s.recovery, 0)}</td>
-                      <td className={`amount ${tone(s.profit)}`}>{signedYen(s.profit)}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
-        </section>
-
-        <section className="card" aria-label="どこで勝ち、どこで負けているか">
-          <div className="sec-row">
-            <h2 className="mincho sec">どこで勝ち、どこで負けているか</h2>
+      {locked ? (
+        <div className="card locked-card">
+          <p>{freeMonth ? 'この期間の分析' : `${Number(month.slice(5))}月の分析`}は完全版で使えます。無料では今月と先月の分析が見られます。</p>
+          <button className="btn-gold" onClick={() => onPaywall(freeMonth ? '長い期間の分析' : '過去の月の分析')}>完全版の内容を見る</button>
+        </div>
+      ) : (
+        <>
+          <div className="grid4">
+            <section className="card stat sm">
+              <div className="stat-head"><span>合計収支</span><Icon name="bars3" className="ic-gold" /></div>
+              <Money n={sum.profit} className="stat-big" />
+              <dl className="stat-meta"><div><dt>投資</dt><dd>{sum.invest.toLocaleString('ja-JP')}円</dd></div><div><dt>回収</dt><dd>{sum.payout.toLocaleString('ja-JP')}円</dd></div></dl>
+            </section>
+            <section className="card stat sm">
+              <div className="stat-head"><span>回収率</span><Icon name="target" className="ic-gold" /></div>
+              <b className="stat-pct">{sum.recovery == null ? '—' : (sum.recovery * 100).toFixed(1)}<small>%</small></b>
+              <div className="ring-c"><Ring ratio={sum.recovery} size={52} /></div>
+            </section>
+            <section className="card stat sm">
+              <div className="stat-head"><span>1回あたりの収支</span></div>
+              {sum.count ? <Money n={Math.round(sum.profit / sum.count)} className="stat-big" /> : <b className="stat-big">—</b>}
+              <p className="stat-wl"><span>総回数 {sum.count}回</span></p>
+            </section>
+            <section className="card stat sm">
+              <div className="stat-head"><span>最多収支の種目</span><Icon name="crown" className="ic-gold" /></div>
+              {best ? <><span className="best-kind"><KindIcon kind={best.k} size={26} />{kindShort(best.k)}</span><Money n={best.s.profit} className="stat-big" /></> : <b className="stat-big">—</b>}
+            </section>
           </div>
-          <div className="tabs small" role="tablist" aria-label="まとめ方">
-            {GROUPS.map((x) => (
-              <button key={x.id} role="tab" aria-selected={group === x.id} className={group === x.id ? 'on' : ''} onClick={() => setGroup(x.id)}>{x.label}</button>
-            ))}
-          </div>
-          {premium ? (
-            groups.length === 0 ? <p className="empty-line">この期間の記入はありません</p> : (
-              <table className="ledger">
-                <thead><tr><th scope="col">{g.head}</th><th scope="col">回数</th><th scope="col">回収率</th><th scope="col">収支</th></tr></thead>
-                <tbody>
-                  {groups.map((r) => (
-                    <tr key={r.key}>
-                      <th scope="row" className="ellipsis">
-                        {r.kind && <i className="kind-bar" style={{ background: KIND_COLOR[r.kind] }} title={kindInfo(r.kind).label} />}{r.label}
-                      </th><td>{r.summary.count}</td><td>{pct(r.summary.recovery, 0)}</td>
-                      <td className={`amount ${tone(r.summary.profit)}`}>{signedYen(r.summary.profit)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )
-          ) : (
-            <div className="paid-note">
-              <p>{g.label}ごとの収支は、有料プランで表示されます。</p>
-              <button className="btn-line" onClick={() => onPaywall(`${g.label}ごとの収支`)}>有料プランの内容を見る</button>
+
+          <section className="card" aria-label="収支の推移">
+            <div className="card-head">
+              <h2>{period === 'month' ? '月間' : '期間'}収支の推移</h2>
+              <Seg label="グラフの中身" value={mode} onChange={setMode} items={MODES} />
             </div>
-          )}
-        </section>
-
-        {period !== 'thisMonth' && period !== 'lastMonth' && (
-          <section className="card chart-block" aria-label="月ごとの収支">
-            <h2 className="mincho sec">月ごとの収支</h2>
-            <MonthlyBars rows={months} />
+            <DotLine {...series} />
           </section>
-        )}
-      </div>
+
+          <div className="pair">
+            <section className="card" aria-label="種目別 収支比較">
+              <div className="card-head wrap">
+                <h2><Icon name="pin" size={20} />種目別<small>収支比較</small></h2>
+                <Seg label="比べる中身" value={kmode} onChange={setKmode} items={MODES} />
+              </div>
+              <SignedBars height={150} color={kmode === 'profit' ? undefined : 'gold'}
+                rows={kindRows.map((r) => ({ label: kindShort(r.k), value: val(r.s, kmode), icon: <KindIcon kind={r.k} size={22} /> }))} />
+            </section>
+            <section className="card" aria-label="投資割合(種目別)">
+              <div className="card-head"><h2><Icon name="clock" size={20} />投資割合<small>(種目別)</small></h2></div>
+              <div className="donut-row">
+                <Donut size={132} stroke={22} parts={kindRows.map((r) => ({ color: KIND_COLOR[r.k], value: r.s.invest }))}>
+                  <span>総投資</span><strong>{investTotal.toLocaleString('ja-JP')}<small>円</small></strong>
+                </Donut>
+                <ul className="legend">
+                  {kindRows.filter((r) => r.s.invest > 0).map((r) => (
+                    <li key={r.k}><i style={{ background: KIND_COLOR[r.k] }} /><span>{kindShort(r.k)}</span><b>{pct(investTotal ? r.s.invest / investTotal : null)}</b></li>
+                  ))}
+                  {investTotal === 0 && <li className="muted">記録がありません</li>}
+                </ul>
+              </div>
+            </section>
+          </div>
+
+          <section className="card" aria-label="ごとの収支比較">
+            <div className="card-head wrap">
+              <h2><Icon name="pin" size={20} />{GROUPS.find((g) => g[0] === group)![1]}別<small>収支比較</small></h2>
+              <Seg label="まとめ方" value={group} onChange={setGroup} items={GROUPS} />
+            </div>
+            {!premium ? (
+              <div className="paid-note">
+                <p>どこで勝ち、どこで負けているかの順位は、完全版で表示されます。</p>
+                <button className="btn-line" onClick={() => onPaywall('店舗・機種・券種・タグごとの収支')}>完全版の内容を見る</button>
+              </div>
+            ) : groups.length === 0 ? <p className="empty-line">この期間の記録はありません</p> : (
+              <ol className="rank-list">
+                {groups.map((r, i) => (
+                  <li key={r.key}>
+                    <span className="rk-no">{i + 1}</span>
+                    <span className="rk-name">{r.kind && <KindIcon kind={r.kind} size={18} />}{r.label}</span>
+                    <span className="rk-bar"><i className={tone(r.summary.profit)} style={{ width: `${(Math.abs(r.summary.profit) / gMax) * 100}%` }} /></span>
+                    <b className={tone(r.summary.profit)}>{signedEn(r.summary.profit)}</b>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </section>
+
+          <section className="card" aria-label="曜日別 収支">
+            <div className="card-head">
+              <h2><Icon name="calendar" size={20} />曜日別<small>収支</small></h2>
+              <button className="btn-line sm" onClick={() => void csv()}><Icon name="fileDown" size={18} />CSV書き出し</button>
+            </div>
+            <SignedBars rows={week} height={150} />
+          </section>
+
+          <section className="card" aria-label="そのほかの指標">
+            <div className="card-head"><h2>そのほかの指標</h2></div>
+            <dl className="metrics">
+              <div><dt>勝率</dt><dd>{pct(sum.winRate, 0)}<small>{sum.wins}勝{sum.losses}敗</small></dd></div>
+              <div><dt>時給</dt><dd className={sum.hourly == null ? '' : tone(sum.hourly)}>{sum.hourly == null ? '—' : signedEn(Math.round(sum.hourly))}<small>{hours(sum.minutes)}</small></dd></div>
+              <div><dt>1回の最高</dt><dd className={tone(sum.best)}>{signedEn(sum.best)}</dd></div>
+              <div><dt>1回の最低</dt><dd className={tone(sum.worst)}>{signedEn(sum.worst)}</dd></div>
+            </dl>
+          </section>
+        </>
+      )}
     </div>
   );
 }

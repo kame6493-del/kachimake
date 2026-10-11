@@ -1,7 +1,6 @@
-"""1.2.0 のアイコン・起動画面を、見本のアイコン(store-assets/source/icon-navy.png = kachi_ref_02)から作る。
+"""1.2.0 のアイコン・起動画面を、見本のアイコン「勝」(store-assets/source/icon-gold.png = kachi2_ref_10)から作る。
 python scripts/make_native_assets.py(先に scripts/cut_ref_images.py)
-- 見本は紺の地に角丸の板が描かれた絵。板の外枠(x 68〜1182, y 74〜1177)で切って 1024 の正方形にする。
-  角の外側に少し残る地の紺は、ストア・端末の角丸の切り抜き(半径 20% 以上)で隠れる
+- 見本は黒い地いっぱいに金の「勝」と円・棒グラフが描かれた正方形の絵。そのまま 1024 に縮める
 - store-assets/icon-1024.png / play-icon-512.png … ストア用
 - Android: 旧アイコン(四角・丸)、適応アイコン(背景=板の縁の紺、前景=絵を縮めて中央)、起動画面(アプリの地の紺に絵)
 - store-assets/check-adaptive-safe-zone.png … 丸・角丸で切った見え方と安全域(66dp)
@@ -14,15 +13,15 @@ from PIL import Image, ImageDraw, ImageFont
 ROOT = Path(__file__).resolve().parent.parent
 RES = ROOT / 'android' / 'app' / 'src' / 'main' / 'res'
 OUT = ROOT / 'store-assets'
-EDGE = (22, 36, 54)
-EDGE_HEX = '#162436'
-APP_BG = (0x11, 0x1A, 0x27)
-FG_SCALE = 0.66
+EDGE = (20, 18, 16)
+EDGE_HEX = '#141210'
+APP_BG = (0x0B, 0x0B, 0x0C)
+FG_SCALE = 0.72
 
 
 def icon1024():
-    src = Image.open(OUT / 'source' / 'icon-navy.png').convert('RGB')
-    return src.crop((68, 74, 1182, 1177)).resize((1024, 1024), Image.LANCZOS)
+    src = Image.open(OUT / 'source' / 'icon-gold.png').convert('RGB')
+    return src.resize((1024, 1024), Image.LANCZOS)
 
 
 def fg_layer(icon, size):

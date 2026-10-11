@@ -28,13 +28,13 @@ export function drawCard(card: ShareCard): HTMLCanvasElement {
   const g = c.getContext('2d')!;
   const plus = card.amount > 0;
 
-  g.fillStyle = '#111a27';
+  g.fillStyle = '#0b0b0c';
   g.fillRect(0, 0, W, H);
   // 放射の線(勝ちのときだけ)
   if (plus) {
     g.save();
     g.translate(W / 2, 560);
-    g.fillStyle = 'rgba(93,155,243,0.10)';
+    g.fillStyle = 'rgba(210,178,122,0.10)';
     for (let i = 0; i < 24; i++) {
       g.rotate((Math.PI * 2) / 24);
       g.beginPath();
@@ -49,27 +49,27 @@ export function drawCard(card: ShareCard): HTMLCanvasElement {
 
   // 白いまとまり
   const x = 70, y = 250, w = W - 140, h = 640;
-  g.fillStyle = '#18222f';
+  g.fillStyle = '#161616';
   roundRect(g, x, y, w, h, 36);
   g.fill();
 
   g.textAlign = 'center';
-  g.fillStyle = '#e9eef6';
+  g.fillStyle = '#dcc08a';
   g.font = `800 60px ${FONT}`;
   g.fillText(fit(g, card.head, W - 160), W / 2, 170);
 
   if (card.badge) {
     g.font = `900 52px ${FONT}`;
     const bw = g.measureText(card.badge).width + 64;
-    g.fillStyle = plus ? '#a9c9f6' : '#334156';
+    g.fillStyle = plus ? '#d2b27a' : '#3a3630';
     roundRect(g, (W - bw) / 2, y + 60, bw, 84, 42);
     g.fill();
-    g.fillStyle = plus ? '#0f1b2c' : '#e9eef6';
+    g.fillStyle = plus ? '#22190b' : '#f1eee7';
     g.fillText(card.badge, W / 2, y + 122);
   }
 
   const amountText = card.hideAmount ? (plus ? '+¥ ???' : card.amount < 0 ? '-¥ ???' : '±¥0') : signedYen(card.amount);
-  g.fillStyle = plus ? '#4fd08f' : card.amount < 0 ? '#f06b6b' : '#94a1b5';
+  g.fillStyle = plus ? '#4cc27a' : card.amount < 0 ? '#ef5b54' : '#a49f95';
   let size = 190;
   g.font = `900 ${size}px ${FONT}`;
   while (g.measureText(amountText).width > w - 80 && size > 80) {
@@ -78,17 +78,17 @@ export function drawCard(card: ShareCard): HTMLCanvasElement {
   }
   g.fillText(amountText, W / 2, y + 250 + size * 0.75);
 
-  g.fillStyle = '#94a1b5';
+  g.fillStyle = '#a49f95';
   g.font = `700 46px ${FONT}`;
   card.lines.slice(0, 2).forEach((l, i) => g.fillText(fit(g, l, w - 80), W / 2, y + 520 + i * 64));
 
   // 下: アプリ名
-  g.fillStyle = '#e9eef6';
+  g.fillStyle = '#dcc08a';
   g.font = `900 92px ${FONT}`;
   g.fillText('カチマケ', W / 2, H - 230);
   g.font = `700 40px ${FONT}`;
   g.fillText('パチンコ・スロット・競馬の収支を30秒で記録', W / 2, H - 160);
-  g.fillStyle = '#5d9bf3';
+  g.fillStyle = '#d2b27a';
   g.font = `600 32px ${FONT}`;
   g.fillText('#カチマケ', W / 2, H - 100);
   return c;

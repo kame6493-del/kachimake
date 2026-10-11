@@ -2,7 +2,7 @@
   "appId": "jp.kachimake.app",
   "appName": "カチマケ",
   "webDir": "dist",
-  "backgroundColor": "#111a27",
+  "backgroundColor": "#0b0b0c",
   "ios": {
     "contentInset": "never"
   },
@@ -12,7 +12,7 @@
   "plugins": {
     "LocalNotifications": {
       "smallIcon": "ic_stat_notify",
-      "iconColor": "#5D9BF3"
+      "iconColor": "#D2B27A"
     }
   }
 }

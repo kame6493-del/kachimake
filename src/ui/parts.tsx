@@ -1,8 +1,8 @@
-// 1.2.0 の共通部品: 線のアイコン、種目のアイコン(見本から切り出した丸い絵)、画面の見出し、月の切り替え
+// 1.2.0 の共通部品(黒と金の見本 kachi2_ref_01〜10): 線のアイコン、種目の絵(見本から切り出し)、画面の見出し、月の選択
 import type { ReactNode } from 'react';
 import type { Kind } from '../domain/types';
 import { kindInfo } from '../domain/types';
-import { addMonths } from '../domain/data';
+import { addMonths, today } from '../domain/data';
 import { monthJa } from './format';
 
 const P: Record<string, string> = {
@@ -63,6 +63,18 @@ const P: Record<string, string> = {
   game: 'M6 8h12a4 4 0 0 1 4 4v2a3 3 0 0 1-5.5 1.7L15 14H9l-1.5 1.7A3 3 0 0 1 2 14v-2a4 4 0 0 1 4-4zM7 11v3M5.5 12.5h3M15.5 12h.1M17.5 13.5h.1',
   backspace: 'M8 5h12v14H8l-6-7zM11 9l6 6M17 9l-6 6',
   yen: 'M6 4l6 8 6-8M12 12v8M8 13h8M8 16h8',
+  shield: 'M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6zM9 12l2 2 4-4',
+  crown: 'M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5z',
+  alert: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 7.5v6M12 16.5v.1',
+  moon: 'M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z',
+  reset: 'M4 12a8 8 0 1 0 2.5-5.8M4 4v4h4',
+  stop: 'M7 7h10v10H7z',
+  timer: 'M12 6a7.5 7.5 0 1 0 0 15 7.5 7.5 0 0 0 0-15zM12 9.5v4l2.5 1.5M10 2.5h4M18.5 6.5l1.5-1.5',
+  history: 'M4 6h2M9 6h11M4 12h2M9 12h11M4 18h2M9 18h11',
+  cloudUp: 'M7 18a5 5 0 0 1-.5-10A6 6 0 0 1 18 9a4.5 4.5 0 0 1-1 9H7M12 15V10M9.5 12.5 12 10l2.5 2.5',
+  cloudDown: 'M7 18a5 5 0 0 1-.5-10A6 6 0 0 1 18 9a4.5 4.5 0 0 1-1 9H7M12 10v5M9.5 12.5 12 15l2.5-2.5',
+  building: 'M4 21V5l8-2v18M12 8h8v13M7 8h2M7 12h2M7 16h2M15 12h2M15 16h2M2 21h20',
+  frown: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM8 16c2-2 6-2 8 0M9 10v.1M15 10v.1',
 };
 
 export function Icon({ name, size = 22, className = '' }: { name: keyof typeof P | string; size?: number; className?: string }) {
@@ -73,23 +85,28 @@ export function Icon({ name, size = 22, className = '' }: { name: keyof typeof P
   );
 }
 
-/** 種目の色。見本の「カテゴリ別の上限設定」の丸と同じ */
+/** 種目の色(見本の「投資割合」の凡例と同じ並び) */
 export const KIND_COLOR: Record<Kind, string> = {
-  pachinko: '#4a8ef5', slot: '#9a64ee', keiba: '#3ec084', keirin: '#ee8e3a', boat: '#8d96a8', auto: '#d7b23c', other: '#4fb3c4',
+  pachinko: '#ef5b54', slot: '#4a8ff0', keiba: '#4cc27a', keirin: '#7db6f5', boat: '#9b6cf0', auto: '#f0a040', other: '#9a958c',
 };
 const KIND_IMG: Partial<Record<Kind, string>> = {
-  pachinko: './img/kind_pachinko.png', slot: './img/kind_slot.png', keiba: './img/kind_keiba.png', keirin: './img/kind_keirin.png', boat: './img/kind_boat.png',
+  pachinko: './img/kind_pachinko.png', slot: './img/kind_slot.png', keiba: './img/kind_keiba.png',
+  keirin: './img/kind_keirin.png', boat: './img/kind_boat.png', auto: './img/kind_auto.png',
 };
-/** 選ぶボタン・表の短い名前(ボートレース→ボート) */
-export const kindShort = (k: Kind) => kindInfo(k).label.replace('レース', '');
+const SHORT: Record<Kind, string> = { pachinko: 'パチンコ', slot: 'スロット', keiba: '競馬', keirin: '競輪', boat: 'ボート', auto: 'オート', other: 'その他' };
+const LETTER: Record<Kind, string> = { pachinko: 'パ', slot: 'ス', keiba: '競', keirin: '輪', boat: 'ボ', auto: 'オ', other: '他' };
+/** 画面での短い名前(見本の書き方: スロット・ボート・オート) */
+export const kindShort = (k: Kind) => SHORT[k] ?? kindInfo(k).label;
+/** カレンダーのマスの1文字 */
+export const kindLetter = (k: Kind) => LETTER[k] ?? '他';
 
-/** 種目の丸いアイコン。絵の無いオート・その他は色の丸に1文字 */
+/** 種目の絵。絵の無い「その他」は色の丸に1文字 */
 export function KindIcon({ kind, size = 28 }: { kind: Kind; size?: number }) {
   const src = KIND_IMG[kind];
   if (src) return <img className="kind-ic" src={src} width={size} height={size} alt="" />;
   return (
     <span className="kind-ic kind-ic-text" style={{ width: size, height: size, background: KIND_COLOR[kind], fontSize: size * 0.42 }} aria-hidden="true">
-      {kindInfo(kind).short}
+      {kindLetter(kind)}
     </span>
   );
 }
@@ -98,70 +115,99 @@ export function KindDot({ kind }: { kind: Kind }) {
   return <span className="kind-dot" style={{ background: KIND_COLOR[kind] }} aria-hidden="true" />;
 }
 
-/** 画面の見出し: 左にロゴの棒と「カチマケ」、下に一言。右に月の切り替えなど */
-export function BrandHead({ sub, right }: { sub: string; right?: ReactNode }) {
+/** タブの画面の見出し: 金の棒+明朝の金の題。ホームだけは見本の「カチマケ」の文字の絵 */
+export function PageHead({ title, right, brand }: { title: string; right?: ReactNode; brand?: boolean }) {
   return (
-    <header className="brand-head">
-      <img className="brand-logo" src="./img/logo_bars.png" alt="" width={34} height={36} />
-      <div className="brand-text">
-        <h1>カチマケ</h1>
-        <p>{sub}</p>
-      </div>
-      {right && <div className="brand-right">{right}</div>}
+    <header className="page-head">
+      {brand
+        ? <h1 className="brand-word"><img src="./img/logo_word.png" alt={title} width={170} height={34} /></h1>
+        : <h1 className="ph-title"><img src="./img/logo_bars.png" alt="" width={30} height={31} />{title}</h1>}
+      {right && <div className="ph-right">{right}</div>}
     </header>
   );
 }
 
-/** 戻る付きの見出し(記録を追加・上限設定など、上に重なる画面) */
-export function BackHead({ title, sub, onBack, right, center }: { title: string; sub?: string; onBack: () => void; right?: ReactNode; center?: boolean }) {
+/** 上に重なる画面の見出し: 左に戻る、真ん中に明朝の金の題 */
+export function BackHead({ title, sub, onBack, right, label = true }: { title: string; sub?: string; onBack: () => void; right?: ReactNode; label?: boolean }) {
   return (
-    <header className={`back-head ${center ? 'center' : ''}`}>
-      <button className="back-btn" onClick={onBack} aria-label="戻る">
-        <Icon name="left" size={26} />{center && <span>戻る</span>}
-      </button>
-      <div className="back-text">
+    <header className="back-head">
+      <div className="bh-row">
+        <button className="back-btn" onClick={onBack} aria-label="戻る"><Icon name="left" size={26} />{label && <span>戻る</span>}</button>
         <h1>{title}</h1>
-        {sub && <p>{sub}</p>}
+        <div className="bh-right">{right}</div>
       </div>
-      {right ?? (center ? <span className="back-spacer" /> : null)}
+      {sub && <p className="bh-sub">{sub}</p>}
     </header>
   );
 }
 
-/** 年月と前後の矢印 */
-export function MonthPill({ month, setMonth }: { month: string; setMonth: (m: string) => void }) {
+/** 年月の選択(見本の「2024年11月 ▾」)。記録のある最初の月から今月まで選べる */
+export function MonthSelect({ month, setMonth, first, onCalendar }: { month: string; setMonth: (m: string) => void; first?: string; onCalendar?: () => void }) {
+  const now = today().slice(0, 7);
+  let lo = addMonths(now, -11);
+  if (first && first < lo) lo = first;
+  if (month < lo) lo = month;
+  const hi = month > now ? month : now;
+  const list: string[] = [];
+  for (let m = hi; m >= lo && list.length < 240; m = addMonths(m, -1)) list.push(m);
   return (
-    <div className="month-pill">
-      <Icon name="calendar" size={18} />
-      <span className="month-pill-label">{monthJa(month)}</span>
-      <button aria-label="前の月" onClick={() => setMonth(addMonths(month, -1))}><Icon name="left" size={18} /></button>
-      <button aria-label="次の月" onClick={() => setMonth(addMonths(month, 1))}><Icon name="right" size={18} /></button>
+    <div className="month-sel">
+      {onCalendar && <button className="ms-cal" aria-label="カレンダーを開く" onClick={onCalendar}><Icon name="calendar" size={24} /></button>}
+      <label className="ms-pill">
+        <span>{monthJa(month)}</span>
+        <Icon name="down" size={18} />
+        <select value={month} aria-label="月を選ぶ" onChange={(e) => setMonth(e.target.value)}>
+          {list.map((m) => <option key={m} value={m}>{monthJa(m)}</option>)}
+        </select>
+      </label>
     </div>
   );
 }
 
-/** 種目のしぼり込み(すべて+種目)。横に流れる */
-export function KindChips({ kinds, value, onChange, allLabel = 'すべて' }: { kinds: Kind[]; value: Kind | 'all'; onChange: (k: Kind | 'all') => void; allLabel?: string }) {
+/** 種目のしぼり込み(すべて+種目)。選んでいる物は金。横に流れる */
+export function KindChips({ kinds, value, onChange, all = true }: { kinds: Kind[]; value: Kind | 'all'; onChange: (k: Kind | 'all') => void; all?: boolean }) {
   return (
     <div className="kind-chips" role="radiogroup" aria-label="種目">
-      <button role="radio" aria-checked={value === 'all'} className={`kchip ${value === 'all' ? 'on' : ''}`} onClick={() => onChange('all')}>
-        <Icon name="layers" size={18} />{allLabel}
-      </button>
+      {all && <button role="radio" aria-checked={value === 'all'} className={`kchip ${value === 'all' ? 'on' : ''}`} onClick={() => onChange('all')}>すべて</button>}
       {kinds.map((k) => (
-        <button key={k} role="radio" aria-checked={value === k} className={`kchip ${value === k ? 'on' : ''}`} onClick={() => onChange(k)}>
-          <KindIcon kind={k} size={22} />{kindShort(k)}
-        </button>
+        <button key={k} role="radio" aria-checked={value === k} className={`kchip ${value === k ? 'on' : ''}`} onClick={() => onChange(k)}>{kindShort(k)}</button>
       ))}
     </div>
   );
 }
 
-/** 金額: 数字は大きく、円は小さく(見本の「+32,400円」) */
+/** 小さな切り替え(見本の「収支|累計|投資|回収」) */
+export function Seg<T extends string>({ items, value, onChange, label }: { items: [T, string][]; value: T; onChange: (v: T) => void; label: string }) {
+  return (
+    <div className="seg" role="tablist" aria-label={label}>
+      {items.map(([v, l]) => (
+        <button key={v} role="tab" aria-selected={value === v} className={value === v ? 'on' : ''} onClick={() => onChange(v)}>{l}</button>
+      ))}
+    </div>
+  );
+}
+
+/** 金額: 数字は大きく、円は小さく(見本の「+172,350円」) */
 export function Money({ n, signed = true, className = '' }: { n: number; signed?: boolean; className?: string }) {
   const a = Math.abs(Math.round(n)).toLocaleString('ja-JP');
   const sign = !signed ? (n < 0 ? '-' : '') : n > 0 ? '+' : n < 0 ? '-' : '±';
   const tone = !signed ? '' : n > 0 ? 'plus' : n < 0 ? 'minus' : 'zero';
   return <span className={`money ${tone} ${className}`}>{sign}{a}<small>円</small></span>;
+}
+
+/** 回収率の輪(見本の赤い輪)。100% 以上は勝ちの色 */
+export function Ring({ ratio, size = 64 }: { ratio: number | null; size?: number }) {
+  const st = size * 0.14;
+  const r = (size - st) / 2;
+  const c = 2 * Math.PI * r;
+  const v = ratio == null ? 0 : Math.min(1, ratio);
+  return (
+    <svg className={`ring ${ratio != null && ratio >= 1 ? 'up' : 'down'}`} width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden="true">
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" className="ring-track" strokeWidth={st} />
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" className="ring-val" strokeWidth={st} strokeLinecap="round"
+        strokeDasharray={`${c * v} ${c}`} transform={`rotate(-90 ${size / 2} ${size / 2})`} />
+    </svg>
+  );
 }
 
 export function Switch({ on, onClick, label }: { on: boolean; onClick: () => void; label: string }) {

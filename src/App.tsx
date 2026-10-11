@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { App as NativeApp } from '@capacitor/app';
-import type { AppData, CounterMachine, CounterState, Session, Settings } from './domain/types';
+import type { AppData, CounterMachine, CounterState, Kind, Session, Settings } from './domain/types';
 import { emptyData, today } from './domain/data';
 import { loadData, saveData } from './platform/storage';
 import { loadBilling, purchase, restore, type BillingState, type Plan } from './platform/billing';
@@ -12,7 +12,8 @@ import { History } from './ui/History';
 import { CalendarPage } from './ui/CalendarPage';
 import { Detail } from './ui/Detail';
 import { LimitPage } from './ui/LimitPage';
-import { BackHead, Icon } from './ui/parts';
+import { Icon } from './ui/parts';
+import { Intro } from './ui/Intro';
 import { Analysis } from './ui/Analysis';
 import { Counter } from './ui/Counter';
 import { SettingsPage } from './ui/SettingsPage';
@@ -29,21 +30,24 @@ import { kindInfo } from './domain/types';
 import { newestFirst } from './domain/views';
 
 type Tab = 'home' | 'history' | 'calendar' | 'analysis' | 'settings';
+// 下のタブ(見本 kachi2_ref_01〜08 の並び)
 const TABS: { id: Tab; label: string; icon: string }[] = [
   { id: 'home', label: 'ホーム', icon: 'home' },
-  { id: 'history', label: '履歴', icon: 'list' },
-  { id: 'calendar', label: 'カレンダー', icon: 'calendar' },
+  { id: 'history', label: '記録', icon: 'pencil' },
   { id: 'analysis', label: '分析', icon: 'chart' },
+  { id: 'calendar', label: 'カレンダー', icon: 'calendar' },
   { id: 'settings', label: '設定', icon: 'gear' },
 ];
 const isTab = (t: string | null): t is Tab => TABS.some((x) => x.id === t);
-/** タブの上に重なる画面 */
+/** タブの上に重なる画面(記録の詳細だけは下から出る板) */
 type Layer = { kind: 'detail'; id: string } | { kind: 'limit' } | { kind: 'counter' } | null;
 
 const UNLOCK_KEY = 'kachimake.unlockUntil';
 const DAILY_KEY = 'kachimake.rewardDaily';
 const REVIEW_KEY = 'kachimake.review';
 const INTRO_KEY = 'kachimake.introShown';
+/** はじめの画面を見終えたか */
+const WELCOME_KEY = 'kachimake.welcomeSeen';
 const readLocal = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };
 const writeLocal = (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* この回だけ有効 */ } };
 const untilText = (t: number) => {
@@ -79,7 +83,9 @@ export default function App() {
   const [selected, setSelected] = useState(today());
   // 開発時だけ: ?sheet=form / paywall / intro で画面写真を撮る
   const devSheet = import.meta.env.DEV ? new URLSearchParams(location.search).get('sheet') : null;
-  const [form, setForm] = useState<{ session: Session | null; date: string; template?: Session | null } | null>(devSheet === 'form' ? { session: null, date: today() } : null);
+  const [form, setForm] = useState<{ session: Session | null; date: string; template?: Session | null; preset?: { kind: Kind; target: string; memo: string } } | null>(devSheet === 'form' ? { session: null, date: today() } : null);
+  const [welcome, setWelcome] = useState(devSheet === 'welcome');
+  const [histKind, setHistKind] = useState<Kind | 'all'>('all');
   const [paywall, setPaywall] = useState<string | null>(devSheet === 'paywall' ? '店舗・場ごとの収支' : devSheet === 'intro' ? INTRO : null);
   const [toastMsg, setToastMsg] = useState('');
   const [toastAct, setToastAct] = useState<{ label: string; run: () => void } | null>(null);
@@ -104,7 +110,11 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    loadData().then(setData).catch(() => setData(emptyData()));
+    loadData().then((d) => {
+      setData(d);
+      // はじめの画面: 記録がまだ無く、まだ見ていない人にだけ
+      if (d.sessions.length === 0 && readLocal(WELCOME_KEY) !== '1') setWelcome(true);
+    }).catch(() => setData(emptyData()));
     loadBilling().then(setBilling);
     void initAds().then(setAds);
   }, []);
@@ -136,6 +146,7 @@ export default function App() {
   const back = useRef<() => void>(() => {});
   back.current = () => {
     if (paywall) setPaywall(null);
+    else if (welcome) setWelcome(false);
     else if (form) setForm(null);
     else if (layer) setLayer(null);
     else if (tab !== 'home') setTab('home');
@@ -191,7 +202,7 @@ export default function App() {
 
   if (!data) return <div className="boot" aria-busy="true"><span>記入を読み込んでいます</span></div>;
 
-  const upsert = (s: Session) => {
+  const upsert = (s: Session, cont = false) => {
     const exists = data.sessions.some((x) => x.id === s.id);
     mutate((d) => {
       const has = d.sessions.some((x) => x.id === s.id);
@@ -199,7 +210,8 @@ export default function App() {
       sessions.sort((a, b) => (a.date === b.date ? a.createdAt - b.createdAt : a.date < b.date ? -1 : 1));
       return { ...d, sessions };
     });
-    setForm(null);
+    // 保存して続ける: 同じ日・同じ種目と店のまま、次の記録を書く
+    setForm(cont ? { session: null, date: s.date, template: s } : null);
     setSelected(s.date);
     setMonth(s.date.slice(0, 7));
     // 新しく記入した勝ちだけ演出する(直したときや負けの記入では出さない)
@@ -223,7 +235,7 @@ export default function App() {
       };
       setCelebrate({ kind: h, amount: s.payout - s.invest });
     } else {
-      toast(exists ? '直しました' : '記入しました');
+      toast(exists ? '直しました' : cont ? '保存しました。続けて記録できます' : '記録しました');
       if (intro) window.setTimeout(openIntro, 700);
     }
   };
@@ -287,7 +299,7 @@ export default function App() {
     if (await purchase(p)) {
       await refreshBilling();
       setPaywall(null);
-      toast('有料プランが有効になりました');
+      toast('完全版が有効になりました');
     }
   };
   const doRestore = async () => {
@@ -335,56 +347,61 @@ export default function App() {
   const openDetail = (s: Session) => setLayer({ kind: 'detail', id: s.id });
   const addAt = (date: string) => setForm({ session: null, date });
   const fabDate = tab === 'calendar' ? selected : today();
+  const editSession = (x: Session) => { setLayer(null); setForm({ session: x, date: x.date }); };
 
   return (
     <div className={`app win-${data.settings.winColor}`}>
-      <main hidden={!!layer}>
+      <main hidden={!!layer && layer.kind !== 'detail'}>
         {tab === 'home' && (
-          <Home data={data} month={month} setMonth={setMonth} premium={access} onOpen={openDetail} onShare={() => void shareMonth()}
-            onPaywall={setPaywall} onLimit={() => setLayer({ kind: 'limit' })} onHistory={() => setTab('history')}
-            onAnalysis={() => setTab('analysis')} onCounter={() => setLayer({ kind: 'counter' })} />
+          <Home data={data} month={month} setMonth={setMonth} premium={access} onShare={() => void shareMonth()}
+            onPaywall={setPaywall} onLimit={() => setLayer({ kind: 'limit' })}
+            onHistory={(k) => { setHistKind(k ?? 'all'); setTab('history'); window.scrollTo(0, 0); }}
+            onAnalysis={() => setTab('analysis')} onCounter={() => setLayer({ kind: 'counter' })} onCalendar={() => setTab('calendar')} />
         )}
-        {tab === 'history' && <History data={data} month={month} setMonth={setMonth} onOpen={openDetail} />}
+        {tab === 'history' && (
+          <History data={data} month={month} setMonth={setMonth} kind={histKind} setKind={setHistKind}
+            onOpen={openDetail} onEdit={editSession} onDelete={remove} />
+        )}
         {tab === 'calendar' && (
           <CalendarPage data={data} month={month} setMonth={setMonth} selected={selected} setSelected={setSelected} onOpen={openDetail} onAdd={addAt} />
         )}
-        {tab === 'analysis' && <Analysis data={data} premium={access} unlockedUntil={!premium && access ? untilText(unlockUntil) : null} onPaywall={setPaywall} />}
+        {tab === 'analysis' && <Analysis data={data} month={month} setMonth={setMonth} premium={access} unlockedUntil={!premium && access ? untilText(unlockUntil) : null} onPaywall={setPaywall} />}
         {tab === 'settings' && (
           <SettingsPage data={data} premium={premium} setSettings={setSettings} replaceData={commit}
             onPaywall={setPaywall} onRestore={doRestore} toast={toast}
             onLimit={() => setLayer({ kind: 'limit' })} onCounter={() => setLayer({ kind: 'counter' })}
+            onIntro={() => setWelcome(true)}
             onPrivacyOptions={ads.privacyOptions ? () => void showPrivacyOptions() : undefined} />
         )}
       </main>
 
-      {layer && (
+      {layer && layer.kind !== 'detail' && (
         <main className="layer">
-          {layer.kind === 'detail' && (detail ? (
-            <Detail data={data} session={detail} premium={access} onBack={() => setLayer(null)} onGo={openDetail}
-              onEdit={(x) => setForm({ session: x, date: x.date })}
-              onCopy={(x) => setForm({ session: null, date: today(), template: x })}
-              onDelete={remove} onPaywall={setPaywall} />
-          ) : <div className="page"><BackHead title="記録詳細" onBack={() => setLayer(null)} center /><p className="empty-card">この記録は見つかりませんでした</p></div>)}
           {layer.kind === 'limit' && <LimitPage data={data} setSettings={setSettings} toast={toast} onBack={() => setLayer(null)} />}
           {layer.kind === 'counter' && (
-            <div className="page counter-page">
-              <BackHead title="小役カウンター" sub="数えている間は画面が消えません。" onBack={() => setLayer(null)} />
-              <Counter data={data} premium={access} onPaywall={setPaywall} setCounter={setCounter}
-                saveMachine={saveMachine} deleteMachine={deleteMachine} toast={toast} />
-            </div>
+            <Counter data={data} premium={access} onPaywall={setPaywall} setCounter={setCounter}
+              saveMachine={saveMachine} deleteMachine={deleteMachine} toast={toast} onClose={() => setLayer(null)}
+              onRecord={(target, memo) => { setLayer(null); setForm({ session: null, date: today(), preset: { kind: 'slot', target, memo } }); }} />
           )}
         </main>
+      )}
+      {layer?.kind === 'detail' && detail && (
+        <Detail data={data} session={detail} premium={access} onClose={() => setLayer(null)}
+          onEdit={editSession}
+          onCopy={(x) => { setLayer(null); setForm({ session: null, date: today(), template: x }); }}
+          onDelete={remove} onPaywall={setPaywall} />
       )}
 
       {adsMock && bannerVisible && <div className="ad-mock" aria-hidden="true">広告(開発用の見本)</div>}
 
-      {!layer && (tab === 'home' || tab === 'history' || tab === 'calendar') && (
+      {(!layer || layer.kind === 'detail') && (tab === 'home' || tab === 'history' || tab === 'calendar') && (
         <button className="fab" aria-label="収支を記録" onClick={() => addAt(fabDate)}><Icon name="plus" size={30} /></button>
       )}
 
-      <nav className="tabbar" aria-label="画面の切り替え">
+      {/* 負け上限・小役カウンターは見本どおり下のタブを出さない(戻る・終了で戻る) */}
+      <nav className="tabbar" aria-label="画面の切り替え" hidden={!!layer && layer.kind !== 'detail'}>
         {TABS.map((t) => {
-          const on = tab === t.id && !layer;
+          const on = tab === t.id && (!layer || layer.kind === 'detail');
           return (
             <button key={t.id} className={on ? 'on' : ''} aria-current={on ? 'page' : undefined} onClick={() => { setLayer(null); setTab(t.id); }}>
               <Icon name={t.icon} size={24} />
@@ -395,7 +412,7 @@ export default function App() {
       </nav>
 
       {form && (
-        <SessionForm key={form.session?.id ?? `new-${form.template?.id ?? ''}`} initial={form.session} template={form.template} date={form.date}
+        <SessionForm key={form.session?.id ?? `new-${form.template?.id ?? ''}${form.preset ? '-counter' : ''}`} initial={form.session} template={form.template} preset={form.preset} date={form.date}
           history={data.sessions} lastKind={lastKind} onSave={upsert} onDelete={remove} onClose={() => setForm(null)} />
       )}
       {paywall && (
@@ -407,6 +424,9 @@ export default function App() {
           <span>{toastMsg}</span>
           {toastAct && <button onClick={() => { const r = toastAct.run; setToastMsg(''); setToastAct(null); r(); }}>{toastAct.label}</button>}
         </div>
+      )}
+      {welcome && (
+        <Intro onStart={() => { writeLocal(WELCOME_KEY, '1'); setWelcome(false); }} onLater={() => setWelcome(false)} />
       )}
       {celebrate && <Celebrate kind={celebrate.kind} amount={celebrate.amount} onDone={endCelebrate} />}
     </div>

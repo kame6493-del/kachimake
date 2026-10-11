@@ -1,12 +1,11 @@
-// カレンダー(見本 08): 月の収支と勝ち負けの日数、種目のしぼり込み、日ごとの収支、選んだ日の記録
-import { useMemo, useState } from 'react';
+// カレンダー(見本 kachi2_ref_05): 日ごとの収支を色のマスで、行った種目を1文字で。選んだ日の合計と記録、見方
+import { useMemo } from 'react';
 import type { AppData, Kind, Session } from '../domain/types';
 import { KINDS } from '../domain/types';
-import { byDate, inRange, profit, summarize } from '../domain/stats';
-import { monthRange, pad, today } from '../domain/data';
-import { dayRecord } from '../domain/views';
-import { BrandHead, Icon, KindChips, KindIcon, KIND_COLOR, kindShort, Money, MonthPill } from './parts';
-import { dateJa, en, monthJa, pct, signedEn, tone } from './format';
+import { profit, summarize } from '../domain/stats';
+import { addMonths, pad, today } from '../domain/data';
+import { Icon, KindIcon, kindLetter, kindShort, Money, MonthSelect, PageHead } from './parts';
+import { dateJa, en, hours, monthJa, signedEn, tone } from './format';
 
 interface Props {
   data: AppData;
@@ -21,128 +20,120 @@ interface Props {
 const amt = (n: number) => (n > 0 ? '+' : n < 0 ? '-' : '±') + Math.abs(n).toLocaleString('ja-JP');
 
 export function CalendarPage({ data, month, setMonth, selected, setSelected, onOpen, onAdd }: Props) {
-  const [kind, setKind] = useState<Kind | 'all'>('all');
-  const list = useMemo(() => (kind === 'all' ? data.sessions : data.sessions.filter((s) => s.kind === kind)), [data.sessions, kind]);
-  const { from, to } = monthRange(month);
-  const monthList = useMemo(() => inRange(list, from, to), [list, from, to]);
-  const sum = summarize(monthList);
-  const rec = dayRecord(monthList);
-  const daily = useMemo(() => byDate(monthList), [monthList]);
-  const usedKinds = KINDS.map((k) => k.id).filter((k) => data.sessions.some((s) => s.kind === k));
-  const chipKinds: Kind[] = usedKinds.length ? usedKinds : ['pachinko', 'slot', 'keiba', 'keirin', 'boat'];
+  // 日ごとの収支と、行った種目(種目の並び順)
+  const days = useMemo(() => {
+    const m = new Map<string, { p: number; kinds: Set<Kind> }>();
+    for (const s of data.sessions) {
+      if (s.date.slice(0, 7) !== month) continue;
+      const c = m.get(s.date) ?? { p: 0, kinds: new Set<Kind>() };
+      c.p += profit(s);
+      c.kinds.add(s.kind);
+      m.set(s.date, c);
+    }
+    return m;
+  }, [data.sessions, month]);
 
-  const [y, m] = month.split('-').map(Number);
+  const [y, mo] = month.split('-').map(Number);
   const ws = data.settings.weekStart;
-  const first = new Date(y, m - 1, 1).getDay();
+  const first = new Date(y, mo - 1, 1).getDay();
   const offset = (first - ws + 7) % 7;
-  const days = new Date(y, m, 0).getDate();
-  const prevDays = new Date(y, m - 1, 0).getDate();
+  const count = new Date(y, mo, 0).getDate();
+  const prevDays = new Date(y, mo - 1, 0).getDate();
   const cells: { d: string | null; n: number }[] = [
     ...Array.from({ length: offset }, (_, i) => ({ d: null, n: prevDays - offset + 1 + i })),
-    ...Array.from({ length: days }, (_, i) => ({ d: `${month}-${pad(i + 1)}`, n: i + 1 })),
+    ...Array.from({ length: count }, (_, i) => ({ d: `${month}-${pad(i + 1)}`, n: i + 1 })),
   ];
   for (let n = 1; cells.length % 7; n++) cells.push({ d: null, n });
   const heads = ws === 1 ? ['月', '火', '水', '木', '金', '土', '日'] : ['日', '月', '火', '水', '木', '金', '土'];
   const t = today();
-
-  const dayList = list.filter((s) => s.date === selected);
+  const sel = selected.slice(0, 7) === month ? selected : null;
+  const dayList = sel ? data.sessions.filter((s) => s.date === sel) : [];
   const ds = summarize(dayList);
-  const memo = dayList.find((s) => s.memo.trim())?.memo.trim();
+  const firstMonth = data.sessions.length ? data.sessions[0].date.slice(0, 7) : undefined;
+  const kindOrder = KINDS.map((k) => k.id);
 
   return (
     <div className="page calendar-page">
-      <BrandHead sub="遊びを、記録で味方に。" right={<MonthPill month={month} setMonth={setMonth} />} />
+      <PageHead title="カレンダー" right={<MonthSelect month={month} setMonth={setMonth} first={firstMonth} />} />
 
-      <div className="cal-top">
-        <section className="card cal-sum" aria-label={`${monthJa(month)}の収支`}>
-          <div className="sum-head"><Icon name="calendar" className="ic-blue" />{m}月の収支</div>
-          <Money n={sum.profit} className="sum-big" />
-          <div className="sum-meta"><span>投資 {en(sum.invest)}</span><span>回収 {en(sum.payout)}</span></div>
-        </section>
-        <div className="tiles6">
-          <div className="tile"><span><Icon name="trophy" size={18} className="ic-gold" />勝ち日数</span><b className="plus">{rec.win}<small>日</small></b></div>
-          <div className="tile"><span><Icon name="trendDown" size={18} className="ic-red" />負け日数</span><b className="minus">{rec.lose}<small>日</small></b></div>
-          <div className="tile"><span><Icon name="dash" size={18} />引き分け</span><b>{rec.draw}<small>日</small></b></div>
-          <div className="tile"><span><Icon name="target" size={18} />勝率</span><b>{rec.winRate == null ? '—' : pct(rec.winRate)}</b></div>
-          <div className="tile hot"><span><Icon name="flame" size={18} className="ic-gold" />連勝</span><b className="plus">{rec.bestWin}<small>日</small></b></div>
-          <div className="tile"><span><Icon name="flame" size={18} className="ic-red" />連敗</span><b className="minus">{rec.bestLose}<small>日</small></b></div>
+      <div className="cal-nav">
+        <button className="sq-btn" aria-label="前の月" onClick={() => setMonth(addMonths(month, -1))}><Icon name="left" size={24} /></button>
+        <h2>{monthJa(month)}</h2>
+        <button className="sq-btn" aria-label="次の月" onClick={() => setMonth(addMonths(month, 1))}><Icon name="right" size={24} /></button>
+      </div>
+
+      <div className="cal" role="grid" aria-label={`${monthJa(month)}のカレンダー`}>
+        <div className="cal-heads" role="row">
+          {heads.map((h) => <span key={h} role="columnheader" className={h === '日' ? 'sun' : h === '土' ? 'sat' : ''}>{h}</span>)}
+        </div>
+        <div className="cal-cells">
+          {cells.map((c, i) => {
+            const col = heads[i % 7];
+            const wc = col === '日' ? 'sun' : col === '土' ? 'sat' : '';
+            if (!c.d) return <span key={`o${i}`} className="cc out"><span className="cc-n">{c.n}</span></span>;
+            const v = days.get(c.d);
+            const kinds = v ? kindOrder.filter((k) => v.kinds.has(k)) : [];
+            return (
+              <button key={c.d} className={`cc ${v ? tone(v.p) : 'none'} ${c.d === sel ? 'sel' : ''} ${c.d === t ? 'today' : ''}`}
+                onClick={() => setSelected(c.d!)} aria-pressed={c.d === sel} aria-label={`${dateJa(c.d)}${v ? ` ${signedEn(v.p)}` : ' 記録なし'}`}>
+                <span className={`cc-n ${wc}`}>{c.n}</span>
+                <span className="cc-a">{v ? amt(v.p) : '–'}</span>
+                {kinds.length > 0 && <span className="cc-k">{kinds.slice(0, 2).map((k) => <i key={k}>{kindLetter(k)}</i>)}</span>}
+                {v && v.p >= 30000 && <span className="hot-mark" aria-hidden="true">激</span>}
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      <KindChips kinds={chipKinds} value={kind} onChange={setKind} allLabel="すべての種目" />
-
-      <table className="cal" aria-label={`${monthJa(month)}のカレンダー`}>
-        <thead>
-          <tr>{heads.map((h) => <th key={h} scope="col" className={h === '日' ? 'sun' : h === '土' ? 'sat' : ''}>{h}</th>)}</tr>
-        </thead>
-        <tbody>
-          {Array.from({ length: cells.length / 7 }, (_, w) => (
-            <tr key={w}>
-              {cells.slice(w * 7, w * 7 + 7).map((c, i) => {
-                const col = heads[i];
-                if (!c.d) return <td key={`e${w}${i}`} className="out"><span className="cal-n">{c.n}</span></td>;
-                const v = daily.get(c.d);
-                return (
-                  <td key={c.d} className={`${c.d === selected ? 'sel' : ''} ${c.d === t ? 'today' : ''}`}>
-                    <button onClick={() => setSelected(c.d!)} aria-pressed={c.d === selected} aria-label={`${dateJa(c.d)}${v != null ? ` ${signedEn(v)}` : ''}`}>
-                      <span className={`cal-n ${col === '日' ? 'sun' : col === '土' ? 'sat' : ''}`}>{c.n}</span>
-                      {v != null && <i className={`cal-dot ${tone(v)}`} aria-hidden="true" />}
-                      {v != null && <span className={`cal-a ${tone(v)}`}>{amt(v)}</span>}
-                      {v != null && v >= 30000 && <span className="hot-mark" aria-hidden="true">激</span>}
-                    </button>
-                  </td>
-                );
-              })}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <div className="cal-legend">
-        <span><i className="cal-dot plus" />勝ち(プラス収支)</span>
-        <span><i className="cal-dot minus" />負け(マイナス収支)</span>
-        <span><i className="cal-dot zero" />引き分け</span>
-      </div>
-
-      <section className="card day-panel" aria-label={`${dateJa(selected)}の記録`}>
-        <div className="grip" aria-hidden="true" />
-        <div className="dp-head">
-          <b>{dateJa(selected)}</b>
-          {dayList.length > 0 && <span className={`badge ${tone(ds.profit)}`}>{ds.profit > 0 ? '勝ち' : ds.profit < 0 ? '負け' : '引き分け'}</span>}
-          {dayList.length > 0 && <span className="dp-sum"><small>収支</small><Money n={ds.profit} /></span>}
-        </div>
-        {dayList.length === 0 ? (
-          <div className="dp-empty">
-            <p>この日の記録はありません</p>
-            <button className="btn-line" onClick={() => onAdd(selected)}><Icon name="plus" size={18} />この日の収支を記録する</button>
+      {sel && (
+        <section className="card day-card" aria-label={`${dateJa(sel)}の合計`}>
+          <div className="card-head">
+            <h2 className="day-title">{sel.slice(0, 4)}年{dateJa(sel)}</h2>
+            <button className="more" onClick={() => onAdd(sel)}>この日に記録する<Icon name="right" size={16} /></button>
           </div>
-        ) : (
-          <>
-            <div className="dp-tiles">
-              <div><Icon name="coins" /><span><small>投資</small>{en(ds.invest)}</span></div>
-              <div><Icon name="upload" /><span><small>回収</small>{en(ds.payout)}</span></div>
-              <div><Icon name="doc" /><span><small>実戦数</small>{ds.count}件</span></div>
+          <div className="day-tiles">
+            <div><span><Icon name="wallet" size={22} className="ic-sub" />投資合計</span><Money n={ds.invest} signed={false} /></div>
+            <div><span><Icon name="coins" size={22} className="ic-gold" />回収合計</span><Money n={ds.payout} signed={false} /></div>
+            <div><span><Icon name="bars3" size={22} className="ic-gold" />収支</span><Money n={ds.profit} /></div>
+          </div>
+        </section>
+      )}
+
+      {sel && (
+        <section className="card day-list" aria-label="この日の記録">
+          <div className="card-head"><h2>この日の記録</h2><small className="muted">{dayList.length}件</small></div>
+          {dayList.length === 0 ? (
+            <div className="dp-empty">
+              <p>この日の記録はありません</p>
+              <button className="btn-line" onClick={() => onAdd(sel)}><Icon name="plus" size={18} />この日の収支を記録する</button>
             </div>
-            <ul className="dp-list">
+          ) : (
+            <ul>
               {dayList.map((s) => (
                 <li key={s.id}>
                   <button onClick={() => onOpen(s)} aria-label={`${kindShort(s.kind)} ${s.place} ${signedEn(profit(s))} の詳細`}>
                     <KindIcon kind={s.kind} size={34} />
-                    <span className="dp-main">
-                      <span><em style={{ color: KIND_COLOR[s.kind] }}>{kindShort(s.kind)}</em>{s.place}</span>
-                      <small>{s.target}</small>
-                    </span>
-                    <b className={tone(profit(s))}>{signedEn(profit(s))}</b>
-                    <Icon name="right" size={18} className="chev" />
+                    <span className="dl-main"><b>{kindShort(s.kind)}</b><small>{[s.place, s.minutes ? hours(s.minutes) : ''].filter(Boolean).join('・') || s.target}</small></span>
+                    <span className="dl-nums"><span><small>投資</small>{en(s.invest)}</span><span><small>回収</small>{en(s.payout)}</span></span>
+                    <b className={`dl-p ${tone(profit(s))}`}>{signedEn(profit(s))}</b>
+                    <Icon name="right" size={16} className="chev" />
                   </button>
                 </li>
               ))}
             </ul>
-            {memo && (
-              <div className="dp-memo"><Icon name="memo" /><span>メモ</span><p>{memo}</p></div>
-            )}
-            <button className="link-add" onClick={() => onAdd(selected)}><Icon name="plus" size={16} />この日に記録を足す</button>
-          </>
-        )}
+          )}
+        </section>
+      )}
+
+      <section className="card cal-legend" aria-label="カレンダーの見方">
+        <h2>カレンダーの見方</h2>
+        <div>
+          <span><i className="lg-dot plus" /><b>プラス収支の日</b><small>収支がプラスの日</small></span>
+          <span><i className="lg-dot minus" /><b>マイナス収支の日</b><small>収支がマイナスの日</small></span>
+          <span><i className="lg-dot none" /><b>記録なしの日</b><small>記録がない日</small></span>
+          <span><i className="lg-k">パ</i><b>日ごとの種目</b><small>行った種目の略号</small></span>
+        </div>
       </section>
     </div>
   );

@@ -14,13 +14,14 @@ BASE = f'http://localhost:{PORT}/?demo=1&premium=1'
 SHOTS = [
     ('home', '&tab=home', None),
     ('history', '&tab=history', None),
-    ('calendar', '&tab=calendar', None),
-    ('detail', '&view=detail', None),
-    ('form', '&sheet=form', 'form'),
-    ('settings', '&tab=settings', None),
-    ('limit', '&view=limit', None),
+    ('detail', '&tab=history&view=detail', None),
+    ('calendar', '&tab=calendar', 'calendar'),
     ('analysis', '&tab=analysis', None),
+    ('form', '&sheet=form', 'form'),
+    ('limit', '&view=limit', None),
     ('counter', '&view=counter', None),
+    ('settings', '&tab=settings', None),
+    ('welcome', '&sheet=welcome', None),
     ('celebrate', '&celebrate=jackpot', None),
 ]
 
@@ -35,18 +36,20 @@ def main():
             pg.wait_for_selector('.app')
             if special == 'form':
                 # 見本の入力: 種目・金額・店・機種・タグ
-                pg.click('.kind-pick .kchip:has-text("パチンコ")')
-                pg.click('.amount-card >> nth=0 >> button:has-text("+10,000")')
-                pg.click('.amount-card >> nth=0 >> button:has-text("+10,000")')
-                pg.click('.amount-card >> nth=1 >> input')
-                for k in ['4', '8', '0', '0', '0']:
-                    pg.click(f'.kp-grid button:text-is("{k}")')
+                pg.click('.ktile:has-text("パチンコ")')
+                pg.click('.amount-card >> nth=0 >> button:has-text("10,000")')
+                pg.click('.amount-card >> nth=0 >> button:has-text("1,000")')
+                pg.click('.amount-card >> nth=0 >> button:has-text("1,000")')
+                pg.fill('.amount-card >> nth=1 >> input', '28400')
                 pg.click('.hchips .chip >> nth=0')
                 pg.click('.hchips >> nth=1 >> .chip >> nth=0')
                 pg.evaluate("document.activeElement && document.activeElement.blur(); document.querySelector('.page-layer').scrollTo(0, 0)")
+            if special == 'calendar':
+                # 記録のある最後の日を選ぶ
+                pg.click('.cc.plus >> nth=-1')
             pg.wait_for_timeout(500)
             pg.screenshot(path=str(OUT / f'{name}.png'))
-            if name in ('home', 'history', 'calendar', 'settings', 'detail', 'form', 'analysis', 'limit'):
+            if name in ('home', 'history', 'calendar', 'settings', 'form', 'analysis', 'limit', 'counter', 'welcome'):
                 pg.screenshot(path=str(OUT / f'{name}_full.png'), full_page=True)
             print(name)
         b.close()

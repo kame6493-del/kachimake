@@ -73,7 +73,7 @@ public class MonthWidget extends AppWidgetProvider {
         long profit = payout - invest;
         NumberFormat nf = NumberFormat.getIntegerInstance(Locale.JAPAN);
         String amount = profit > 0 ? "+¥" + nf.format(profit) : profit < 0 ? "-¥" + nf.format(-profit) : "±¥0";
-        int color = profit > 0 ? (inkWin ? 0xFF5FA8FF : 0xFF4FD08F) : profit < 0 ? 0xFFF06B6B : 0xFF94A1B5;
+        int color = profit > 0 ? (inkWin ? 0xFF5FA8FF : 0xFF4CC27A) : profit < 0 ? 0xFFEF5B54 : 0xFFA49F95;
         v.setTextViewText(R.id.widget_title, month + "月の収支");
         v.setTextViewText(R.id.widget_amount, amount);
         v.setTextColor(R.id.widget_amount, color);
