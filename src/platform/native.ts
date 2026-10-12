@@ -2,6 +2,7 @@ import { Capacitor } from '@capacitor/core';
 import { KeepAwake } from '@capacitor-community/keep-awake';
 import { InAppReview } from '@capacitor-community/in-app-review';
 import { LocalNotifications } from '@capacitor/local-notifications';
+import { REMIND_BASE, reminderNotifications } from './reminders';
 
 const native = Capacitor.isNativePlatform();
 
@@ -27,8 +28,6 @@ export async function askReview() {
   try { await InAppReview.requestReview(); } catch { /* 出なくても困らない */ }
 }
 
-const REMIND_BASE = 7000;
-
 /** お知らせの許可を求める。許可されたら true */
 export async function allowNotifications(): Promise<boolean> {
   if (!native) return true;
@@ -52,20 +51,7 @@ export async function scheduleReminders(dates: string[], time: string) {
     if (dates.length === 0) return;
     const perm = await LocalNotifications.checkPermissions();
     if (perm.display !== 'granted') return;
-    const [h, m] = time.split(':').map(Number);
-    await LocalNotifications.schedule({
-      notifications: dates.map((d, i) => {
-        const [y, mo, da] = d.split('-').map(Number);
-        return {
-          id: REMIND_BASE + i,
-          title: '今日の収支、記入しましたか?',
-          body: '打った日・買った日は、忘れないうちに30秒で記入できます',
-          schedule: { at: new Date(y, mo - 1, da, h, m), allowWhileIdle: true },
-          smallIcon: 'ic_stat_notify',
-          iconColor: '#F9B712',
-        };
-      }),
-    });
+    await LocalNotifications.schedule({ notifications: reminderNotifications(dates, time) });
   } catch (e) {
     console.error('[kachimake] reminders', e);
   }

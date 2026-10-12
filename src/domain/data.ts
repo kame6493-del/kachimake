@@ -68,6 +68,7 @@ export function normalize(raw: unknown): { data: AppData; dropped: number } {
     monthlyLimit: num(st.monthlyLimit),
     weekStart: st.weekStart === 1 ? 1 : 0,
     winColor: st.winColor === 'blue' ? 'blue' : 'ink',
+    theme: st.theme === 'dark' || st.theme === 'system' ? st.theme : 'light',
     fontScale: st.fontScale === 1.15 || st.fontScale === 1.3 ? st.fontScale : 1,
     remind: (() => {
       const r = (st.remind ?? {}) as Record<string, unknown>;

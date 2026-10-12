@@ -28,6 +28,7 @@ import { shareCard, type ShareCard } from './platform/shareImage';
 import { dateJa, pct } from './ui/format';
 import { kindInfo } from './domain/types';
 import { newestFirst } from './domain/views';
+import { applyTheme, resolveTheme, systemPrefersDark } from './platform/theme';
 
 type Tab = 'home' | 'history' | 'calendar' | 'analysis' | 'settings';
 // 下のタブ(見本 kachi2_ref_01〜08 の並び)
@@ -174,6 +175,19 @@ export default function App() {
   useEffect(() => {
     document.documentElement.style.setProperty('--zoom', String(fontScale));
   }, [fontScale]);
+
+  // 表示の配色: 明るい(既定)/暗い/端末に合わせる。端末に合わせるときは端末の切り替えにもついていく
+  const themePref = data?.settings.theme;
+  useEffect(() => {
+    if (!themePref) return;
+    applyTheme(resolveTheme(themePref, systemPrefersDark()));
+    if (themePref !== 'system') return;
+    let mq: MediaQueryList | null = null;
+    try { mq = window.matchMedia('(prefers-color-scheme: dark)'); } catch { return; }
+    const on = (e: MediaQueryListEvent) => applyTheme(e.matches ? 'dark' : 'light');
+    mq.addEventListener('change', on);
+    return () => mq?.removeEventListener('change', on);
+  }, [themePref]);
 
   // 夜のお知らせ: 設定か「今日記入したか」が変わったら置き直す
   const remindOn = data?.settings.remind.on ?? false;

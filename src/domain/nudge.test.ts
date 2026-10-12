@@ -132,6 +132,13 @@ describe('新しい項目の読み込み', () => {
     expect(data.sessions[1].tags).toBeUndefined();
     expect(data.settings.fontScale).toBe(1);
     expect(data.settings.remind).toEqual({ on: true, time: '21:30' });
+    // 1.2.1 までのバックアップには表示の配色が無い → 明るい
+    expect(data.settings.theme).toBe('light');
+  });
+  it('表示の配色は 明るい/暗い/端末に合わせる の3つだけを残す', () => {
+    expect(normalize({ sessions: [], settings: { theme: 'dark' } }).data.settings.theme).toBe('dark');
+    expect(normalize({ sessions: [], settings: { theme: 'system' } }).data.settings.theme).toBe('system');
+    expect(normalize({ sessions: [], settings: { theme: 'pink' } }).data.settings.theme).toBe('light');
   });
   it('CSV にレート・玉・印の列が入る', () => {
     const csv = toCsv([s('2026-09-01', 4000, 0, { rate: 4, replay: 1000, tags: ['特定日'] })]);

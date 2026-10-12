@@ -85,9 +85,9 @@ export function Icon({ name, size = 22, className = '' }: { name: keyof typeof P
   );
 }
 
-/** 種目の色(見本の「投資割合」の凡例と同じ並び) */
+/** 種目の色(見本の「投資割合」の凡例と同じ並び)。明るい/暗いで濃さを変えるので index.css の --k-* を指す */
 export const KIND_COLOR: Record<Kind, string> = {
-  pachinko: '#ef5b54', slot: '#4a8ff0', keiba: '#4cc27a', keirin: '#7db6f5', boat: '#9b6cf0', auto: '#f0a040', other: '#9a958c',
+  pachinko: 'var(--k-pachinko)', slot: 'var(--k-slot)', keiba: 'var(--k-keiba)', keirin: 'var(--k-keirin)', boat: 'var(--k-boat)', auto: 'var(--k-auto)', other: 'var(--k-other)',
 };
 const KIND_IMG: Partial<Record<Kind, string>> = {
   pachinko: './img/kind_pachinko.png', slot: './img/kind_slot.png', keiba: './img/kind_keiba.png',

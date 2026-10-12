@@ -193,7 +193,7 @@ export function Donut({ parts, size = 132, stroke = 18, children }: { parts: { c
         {total > 0 && parts.filter((p) => p.value > 0).map((p, i) => {
           const len = (p.value / total) * c;
           const el = (
-            <circle key={i} cx={size / 2} cy={size / 2} r={r} fill="none" stroke={p.color} strokeWidth={stroke}
+            <circle key={i} cx={size / 2} cy={size / 2} r={r} fill="none" style={{ stroke: p.color }} strokeWidth={stroke}
               strokeDasharray={`${Math.max(0, len - 1.5)} ${c}`} strokeDashoffset={-acc} transform={`rotate(-90 ${size / 2} ${size / 2})`} />
           );
           acc += len;

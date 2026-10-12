@@ -4,7 +4,17 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="./icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
-    <meta name="theme-color" content="#0b0b0c" />
+    <meta name="theme-color" content="#f4f6f9" />
+    <script>
+      // 前回の配色で描き始める(既定は明るい)。中身の設定を読み込んだあと App が正しい配色に直す
+      (function () {
+        var t = 'light';
+        try { t = localStorage.getItem('kachimake.theme') === 'dark' ? 'dark' : 'light'; } catch (e) {}
+        document.documentElement.setAttribute('data-theme', t);
+        document.documentElement.style.colorScheme = t;
+        document.querySelector('meta[name="theme-color"]').setAttribute('content', t === 'dark' ? '#0b0b0c' : '#f4f6f9');
+      })();
+    </script>
     <meta name="format-detection" content="telephone=no" />
     <title>カチマケ</title>
   </head>

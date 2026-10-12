@@ -62,7 +62,7 @@ export function installDemo(params: URLSearchParams) {
     ? { machineId: 'sample', games: 3482, counts: { bell: 438, cherry: 104, bonus: 13 } }
     : null;
   localStorage.setItem('CapacitorStorage.kachimake.data.v1', JSON.stringify({
-    version: 1, sessions, settings: { monthlyLimit: 60000, weekStart: 0, winColor: 'ink', fontScale: Number(params.get('font')) || 1, remind: { on: true, time: '21:30' } }, machines: [], counter,
+    version: 1, sessions, settings: { monthlyLimit: 60000, weekStart: 0, winColor: 'ink', fontScale: Number(params.get('font')) || 1, theme: params.get('theme') === 'dark' ? 'dark' : params.get('theme') === 'system' ? 'system' : 'light', remind: { on: true, time: '21:30' } }, machines: [], counter,
   }));
   if (params.get('premium') === '1') localStorage.setItem('kachimake.mockPremium', '1');
   else localStorage.removeItem('kachimake.mockPremium');

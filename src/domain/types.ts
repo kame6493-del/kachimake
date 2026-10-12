@@ -54,11 +54,13 @@ export interface Settings {
   winColor: 'ink' | 'blue';
   /** 文字の大きさ。1=標準 */
   fontScale: 1 | 1.15 | 1.3;
+  /** 画面の配色。既定は明るい。暗いは夜に使う人向け(1.2.1 までの黒い見た目)。system は端末に合わせる */
+  theme: 'light' | 'dark' | 'system';
   /** 夜の記入のお知らせ。time は HH:MM */
   remind: { on: boolean; time: string };
 }
 
-export const DEFAULT_SETTINGS: Settings = { monthlyLimit: 0, weekStart: 0, winColor: 'ink', fontScale: 1, remind: { on: false, time: '21:30' } };
+export const DEFAULT_SETTINGS: Settings = { monthlyLimit: 0, weekStart: 0, winColor: 'ink', fontScale: 1, theme: 'light', remind: { on: false, time: '21:30' } };
 
 /** パチンコ・パチスロのレート(円/玉・円/枚) */
 export const RATES: Record<'pachinko' | 'slot', number[]> = { pachinko: [4, 2, 1, 0.5], slot: [20, 10, 5, 2] };

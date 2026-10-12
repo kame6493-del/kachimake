@@ -11,7 +11,7 @@ import { shouldNudgeBackup } from '../domain/nudge';
 import { Icon, PageHead, Seg } from './parts';
 
 export const LAST_BACKUP_KEY = 'kachimake.lastBackup';
-export const APP_VERSION = '1.2.0';
+export const APP_VERSION = '1.2.2';
 const readLast = () => { try { return Number(localStorage.getItem(LAST_BACKUP_KEY)) || 0; } catch { return 0; } };
 const FONT_SIZES: [Settings['fontScale'], string][] = [[1, '標準'], [1.15, '大きい'], [1.3, 'とても大きい']];
 
@@ -78,6 +78,15 @@ export function SettingsPage({ data, premium, setSettings, replaceData, onPaywal
 
       <section className="card sgroup">
         <h2>表示</h2>
+        <div className="sset">
+          <span className="srow-ic"><Icon name="moon" size={26} /></span>
+          <div className="sset-body">
+            <b>表示</b>
+            <small>暗いは夜や暗い場所で見るとき向けです</small>
+            <Seg label="表示の配色" value={s.theme} onChange={(v) => setSettings({ ...s, theme: v })}
+              items={[['light', '明るい'], ['dark', '暗い'], ['system', '端末に合わせる']]} />
+          </div>
+        </div>
         <div className="sset">
           <span className="srow-ic"><Icon name="text" size={26} /></span>
           <div className="sset-body">
